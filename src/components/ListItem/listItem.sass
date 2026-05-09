@@ -1,0 +1,23 @@
+.list-item
+    display: grid
+    grid-template-columns: 88% 10%
+    column-gap: 2%
+    margin-top: 15px
+    padding: 10px
+    font-size: 18px
+    line-height: 35px
+    &__icon
+        margin-left: 10px
+        cursor: pointer
+        &:first-child:hover
+            color: #0277bd 
+        &:last-child:hover
+            color: #e53935 
+    &.poem-card
+        cursor: pointer
+        display: flex
+        justify-content: space-between
+            
+@media (max-width: 991px)
+    .list-item
+        grid-template-columns: 84% 14%

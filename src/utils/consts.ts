@@ -1,0 +1,9 @@
+export const LOGIN_ROUTE: string  = '/login';
+export const REGISTER_ROUTE: string  = '/register';
+export const MAIN_ROUTE: string  = '/';
+export const POEM_ROUTE: string  = '/poem';
+export const ADD_POEM_ROUTE: string  = '/poem';
+export const AUTHOR_ROUTE: string  = '/author';
+export const ADD_AUTHOR_ROUTE: string  = '/author';
+export const AUTHORS_ROUTE: string  = '/authors';
+export const NOTFOUND_ROUTE: string  = '/404';
