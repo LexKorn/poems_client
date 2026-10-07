@@ -1,49 +1,45 @@
-import React, { useState, useRef, useEffect, useContext } from 'react';
-import { useLocation } from 'react-router-dom';
+import React, { useState, useRef, useEffect } from 'react';
 import { observer } from 'mobx-react-lite';
-import { IPoem } from '../../types/types';
+import { IAuthor, IPoem } from '../../types/types';
 import { deletePoem } from '../../http/poemsAPI';
-import { Context } from '../..';
 import poemStore from '../../store/PoemsStore';
 
 import "./poemEditor.sass";
 
 interface PoemEditorProps {
   poem: IPoem;
+  author: IAuthor
   onSave?: () => void;
 }
 
-const PoemEditor: React.FC<PoemEditorProps> = observer(({poem, onSave}) => {
-  const {users} = useContext(Context);
-  const location = useLocation();
+const PoemEditor: React.FC<PoemEditorProps> = observer(({poem, author, onSave}) => {
   const [title, setTitle] = useState(poem?.title || '');
+  const [authorId, setAuthorId] = useState(poem?.authorId || 0);
   const [content, setContent] = useState(poem?.content || '');
   const [htmlContent, setHtmlContent] = useState(poem?.html_content || '');
   const editorRef = useRef<HTMLDivElement>(null);
 
+  // Определяем, редактируем ли мы существующий стих
+  const isEditing = poem?.id && poem.id > 0;
+
   // Синхронизируем состояние с пропсом poem
   useEffect(() => {
     setTitle(poem?.title || '');
+    setAuthorId(poem?.authorId || 0);
     setContent(poem?.content || '');
     setHtmlContent(poem?.html_content || '');
     
     if (editorRef.current) {
       editorRef.current.innerHTML = poem?.html_content || poem?.content || '';
     }
-  }, [poem]); // Зависимость от пропса poem
 
-  // Также обновляем при изменении currentPoem в сторе
-  useEffect(() => {
-    if (poemStore.currentPoem) {
-      setTitle(poemStore.currentPoem.title || '');
-      setContent(poemStore.currentPoem.content || '');
-      setHtmlContent(poemStore.currentPoem.html_content || '');
-      
-      if (editorRef.current) {
-        editorRef.current.innerHTML = poemStore.currentPoem.html_content || poemStore.currentPoem.content || '';
-      }
+    // Важно: синхронизируем poemStore.currentPoem с переданным poem
+    if (poem?.id) {
+      poemStore.currentPoem = poem;
+    } else {
+      poemStore.currentPoem = null;
     }
-  }, [poemStore.currentPoem]);
+  }, [poem]); 
 
   const formatText = (command: string, value?: string) => {
     document.execCommand(command, false, value);
@@ -74,45 +70,42 @@ const PoemEditor: React.FC<PoemEditorProps> = observer(({poem, onSave}) => {
       return;
     }
     
-    const isUpdate = poemStore.currentPoem?.id && poemStore.currentPoem.id > 0;
-    
-    if (isUpdate && poemStore.currentPoem) {
-      // Обновляем существующий стих
-      await poemStore.updatePoem(poemStore.currentPoem.id, {
-        title: title.trim(),
-        content: currentText,
-        html_content: currentHtml,
-      });
-    } else {
-      // Создаем новый стих
-      await poemStore.createPoem({
-        title: title.trim(),
-        content: currentText,
-        html_content: currentHtml,
-      });
+    try {
+      if (isEditing) {
+        // Обновляем существующий стих
+        await poemStore.updatePoem(poem.id, {
+          title: title.trim(),
+          content: currentText,
+          html_content: currentHtml,
+          authorId: authorId
+        });
+      } else {
+        // Создаем новый стих
+        await poemStore.createPoem({
+          title: title.trim(),
+          content: currentText,
+          html_content: currentHtml,
+          authorId: authorId
+        });
+      }
+      
+      if (onSave) {
+        onSave();
+      }
+    } catch (error) {
+      console.error('Ошибка при сохранении:', error);
     }
-    
-    if (onSave) {
-      onSave(); // Вызываем callback
-    }
-  };
-
-  const handleNewPoem = () => {
-    setTitle('');
-    setContent('');
-    setHtmlContent('');
-    if (editorRef.current) {
-      editorRef.current.innerHTML = '';
-    }
-    poemStore.clearCurrentPoem();
   };
 
   const handleDelete = async () => {
-    if (poemStore.currentPoem?.id && window.confirm('Удалить этот стих?')) {
-      await deletePoem(poemStore.currentPoem.id);
-      poemStore.clearCurrentPoem();
-      handleNewPoem();
-      if (onSave) onSave();
+    if (poem?.id && window.confirm('Удалить этот стих?')) {
+      try {
+        await deletePoem(poem.id);
+        poemStore.clearCurrentPoem();
+        if (onSave) onSave();
+      } catch (error) {
+        console.error('Ошибка при удалении:', error);
+      }
     }
   };
 
@@ -122,6 +115,9 @@ const PoemEditor: React.FC<PoemEditorProps> = observer(({poem, onSave}) => {
       document.execCommand('insertParagraph', false);
     }
   };
+
+  // Проверяем, есть ли у нас стих для редактирования
+  const currentPoem = poemStore.currentPoem || poem;
 
   return (
     <div className="poem-editor">
@@ -191,7 +187,9 @@ const PoemEditor: React.FC<PoemEditorProps> = observer(({poem, onSave}) => {
             ↲
           </button>
         </div>
-        :<div></div>
+
+        <div>{author.name}</div>
+        <div>author.name</div>
 
       <div className="poem-editor__title mb-3">
         <input
@@ -232,13 +230,6 @@ const PoemEditor: React.FC<PoemEditorProps> = observer(({poem, onSave}) => {
               ? 'Сохранение...' 
               : poemStore.currentPoem?.id ? 'Обновить' : 'Создать'}
           </button>
-          <button 
-            className="btn btn-outline-secondary me-2"
-            onClick={handleNewPoem}
-            type="button"
-          >
-            Новый стих
-          </button>
           {poemStore.currentPoem?.id && (
             <button 
               className="btn btn-outline-danger"
@@ -249,7 +240,6 @@ const PoemEditor: React.FC<PoemEditorProps> = observer(({poem, onSave}) => {
             </button>
           )}
         </div>
-        :<div></div>
 
       {poemStore.error && (
         <div className="alert alert-danger mt-3">

@@ -1,10 +1,8 @@
-import React, { useContext, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import {Container, Button, Form, Dropdown} from 'react-bootstrap';
+import React, { useContext } from 'react';
+import {Container, Button, Form} from 'react-bootstrap';
 import { observer } from 'mobx-react-lite';
 
-// import { Context } from '../../index';
-import { AUTHORS_ROUTE } from '../../utils/consts';
+import { Context } from '../../index';
 
 interface CUAuthorProps {
     id: number;
@@ -17,9 +15,7 @@ interface CUAuthorProps {
 
 
 const CUAuthor: React.FC<CUAuthorProps> = observer(({id, name, setName, handler, title, btnName}) => {
-    // const {service} = useContext(Context);
-    const navigate = useNavigate();
-    // const [visible, setVisible] = useState<boolean>(false);
+    const {library} = useContext(Context);
 
     const onClick = () => {
         if (!name.trim()) {
@@ -29,15 +25,20 @@ const CUAuthor: React.FC<CUAuthorProps> = observer(({id, name, setName, handler,
         if (btnName === 'Добавить') {
             // @ts-ignore 
             handler(name)
-                .then(() => {navigate(AUTHORS_ROUTE)})
+                .then(() => {
+                    library.setVisibleModal(false);
+                    window.location.reload();
+                })
                 .catch(err => alert(err.response.data.message));
         } else {
             handler(id, name)
-                .then(() => {navigate(AUTHORS_ROUTE)})
+                .then(() => {
+                    library.setVisibleModal(false);
+                    window.location.reload();
+                })
                 .catch(err => alert(err.response.data.message));
         }
     };
-
 
     return (
         <Container className="d-flex justify-content-center">

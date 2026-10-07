@@ -1,8 +1,7 @@
-import React, {useContext} from 'react';
+import React from 'react';
 import { Card } from 'react-bootstrap';
 
-import { IAuthor, IStamp, IModel } from '../../types/types';
-import { Context } from '../../index';
+import { IAuthor } from '../../types/types';
 
 import './authorItem.sass';
 
@@ -13,8 +12,6 @@ interface AuthorItemProps {
 
 
 const AuthorItem: React.FC<AuthorItemProps> = ({author, onClick}) => {    
-    // const {service} = useContext(Context);
-
         return (
             <Card 
                 className="author-card shadow"

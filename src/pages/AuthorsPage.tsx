@@ -6,7 +6,6 @@ import {Helmet} from "react-helmet";
 
 import List from '../components/List/List';
 import AuthorItem from '../components/AuthorItem/AuthorItem';
-import Statistics from '../components/Statistics/Statistics';
 import SearchPanel from '../components/SearchPanel/SearchPanel';
 import Pageup from '../components/Pageup/Pageup';
 import ModalAuthorAdd from '../components/Modals/ModalAuthorAdd';
@@ -24,29 +23,6 @@ const AuthorsPage: React.FC = observer(() => {
     const [authors, setAuthors] = useState<IAuthor[]>([]);
     const navigate = useNavigate();
 
-    // const authors: IAuthor[] = [
-    //     {
-    //         id: 1,
-    //         name: 'Wolf',
-    //         userId: 1,
-    //     },
-    //     {
-    //         id: 2,
-    //         name: 'Fox',
-    //         userId: 1,
-    //     },
-    //     {
-    //         id: 3,
-    //         name: 'Rabbit',
-    //         userId: 1,
-    //     },
-    //     {
-    //         id: 4,
-    //         name: 'Bear',
-    //         userId: 1,
-    //     },
-    // ];
-
     useEffect(() => {
         fetchAuthors()
             .then(data => {
@@ -61,7 +37,6 @@ const AuthorsPage: React.FC = observer(() => {
             .catch(err => alert(err.message))
     }, []);
     
-
     return (
         <Container
             style={{display: 'flex', flexDirection: 'column', alignItems: 'center'}}
@@ -71,10 +46,8 @@ const AuthorsPage: React.FC = observer(() => {
                 <meta name="description" content="Список авторов" />
             </Helmet>
 
-            <Statistics />
             <SearchPanel authors={authors} />
-            <Button variant={"outline-success"} style={{marginTop: "20px"}} onClick={() => setVisible(true)} >Добавить автора</Button>
-            <h1 style={{textAlign: 'center'}}>Список авторов:</h1>
+            <Button variant={"outline-success"} onClick={() => library.setVisibleModal(true)} >Добавить автора</Button>
             {loading ? <Spinner animation={"border"}/> :
                 <List
                     items={library.visibleAuthors}
@@ -89,7 +62,7 @@ const AuthorsPage: React.FC = observer(() => {
             }
             <Pageup />
             <ModalAuthorAdd
-                show={visible} 
+                show={library.visibleModal} 
                 onHide={() => setVisible(false)}
             />
         </Container>

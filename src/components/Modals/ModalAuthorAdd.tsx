@@ -1,7 +1,8 @@
-import React, {useState} from 'react';
+import React, {useState, useContext} from 'react';
 import {Modal, Button} from 'react-bootstrap';
 
 import { createAuthor } from '../../http/authorsAPI';
+import { Context } from '../../index';
 import CUAuthor from '../CreateUpdate/CUAuthor';
 
 interface ModalPoemAddProps {
@@ -12,6 +13,7 @@ interface ModalPoemAddProps {
 
 const ModalAuthorAdd: React.FC<ModalPoemAddProps> = ({show, onHide}) => {
     const [name, setName] = useState<string>('');
+    const {library} = useContext(Context);
     
     return (
         <Modal
@@ -35,7 +37,7 @@ const ModalAuthorAdd: React.FC<ModalPoemAddProps> = ({show, onHide}) => {
                 />
             </Modal.Body>
             <Modal.Footer>
-                <Button variant={"outline-secondary "} onClick={onHide}>Закрыть</Button>
+                <Button variant={"outline-secondary "} onClick={() => library.setVisibleModal(false)}>Закрыть</Button>
             </Modal.Footer>
         </Modal>
     );

@@ -15,7 +15,7 @@ class PoemStore {
     makeAutoObservable(this);
   }
 
-  async createPoem(data: { title: string; content: string; html_content: string }) {
+  async createPoem(data: { title: string; content: string; html_content: string, authorId: number }) {
     this.isLoading = true;
     this.error = null;
     try {
@@ -37,7 +37,7 @@ class PoemStore {
     }
   }
 
-  async updatePoem(id: number, data: { title?: string; content?: string; html_content?: string }) {
+  async updatePoem(id: number, data: { title?: string; content?: string; html_content?: string, authorId: number }) {
     this.isLoading = true;
     this.error = null;
     try {

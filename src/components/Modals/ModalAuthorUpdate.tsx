@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {Modal, Button} from 'react-bootstrap';
 
 import { updateAuthor } from '../../http/authorsAPI';
@@ -13,7 +13,11 @@ interface ModalAuthorUpdateProps {
 
 
 const ModalAuthorUpdate: React.FC<ModalAuthorUpdateProps> = ({show, onHide, author}) => {
-    const [name, setName] = useState<string>(author.name);
+    const [name, setName] = useState<string>('');
+
+    useEffect(() => {
+        setName(author.name);
+    }, [author]);
     
     return (
         <Modal

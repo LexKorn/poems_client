@@ -1,6 +1,7 @@
 import React, {useState, useEffect, useContext} from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { Button } from 'react-bootstrap';
+import {observer} from 'mobx-react-lite';
 
 import { MAIN_ROUTE, AUTHORS_ROUTE } from "../../utils/consts";
 import { Context } from '../../index';
@@ -8,14 +9,22 @@ import { Context } from '../../index';
 import './header.sass';
 
 
-const Header: React.FC = () => {
+const Header: React.FC = observer(() => {
     const location = useLocation();
     const [classMenu, setClassMenu] = useState<string>('');
     const {users} = useContext(Context);
+    const {library} = useContext(Context);
+    const [quantityAuthors, setQuantityAuthors] = useState<number>(0);
+    const [quantityPoems, setQuantityPoems] = useState<number>(0);
 
     useEffect(() => {
         setClassMenu('');
     }, [location.pathname]);
+
+    useEffect(() => {
+        setQuantityAuthors(library.authors.length);
+        setQuantityPoems(library.poems.length);
+    }, [library.authors, library.poems]);
 
     const menuHandler = () => {
         classMenu === '' ? setClassMenu('open-menu') : setClassMenu('');
@@ -38,12 +47,12 @@ const Header: React.FC = () => {
                         <ul className="header__menu">
                             <li className="header__menu_item">
                                 <NavLink to={MAIN_ROUTE} className={location.pathname === MAIN_ROUTE ? "active" : ''} >
-                                    СТИХОТВОРЕНИЯ
+                                    СТИХОТВОРЕНИЯ ( {quantityPoems} )
                                 </NavLink>
                             </li>
                             <li className="header__menu_item">
                                 <NavLink to={AUTHORS_ROUTE} className={location.pathname === AUTHORS_ROUTE ? "active" : ''} >
-                                    АВТОРЫ
+                                    АВТОРЫ ( {quantityAuthors} )
                                 </NavLink>
                             </li>
                             <li className="header__menu_item">
@@ -62,6 +71,6 @@ const Header: React.FC = () => {
             }
         </>
     );
-};
+});
 
 export default Header;

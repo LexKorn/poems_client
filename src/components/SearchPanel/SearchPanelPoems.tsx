@@ -33,8 +33,6 @@ const SearchPanelPoems: React.FC<SearchPanelPoemsProps> = observer(({poems}) => 
         }
 
         return items.filter(item => {
-            // const poemAuthor: IAuthor[] = authors.filter(author => author.id === item.authorId);
-
             return (             
                 item.title.toLowerCase().indexOf(term.toLowerCase()) > -1
             )

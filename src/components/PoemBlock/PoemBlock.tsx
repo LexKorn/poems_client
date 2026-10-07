@@ -1,14 +1,13 @@
-import React, {useContext, useState, useEffect} from 'react';
+import React, {useState, useEffect} from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useParams } from 'react-router-dom';
 import { Spinner, Button } from 'react-bootstrap';
 import {Helmet} from "react-helmet";
 
-import { IPoem, IAuthor, IStamp, IModel, IMaster } from '../../types/types';
+import { IPoem, IAuthor} from '../../types/types';
 import { AUTHOR_ROUTE, MAIN_ROUTE } from '../../utils/consts';
 import { fetchOnePoem, deletePoem } from '../../http/poemsAPI';
 import { fetchOneAuthor } from '../../http/authorsAPI';
-import {Context} from '../../index';
 
 import './poemBlock.sass';
 
@@ -20,13 +19,8 @@ interface PoemBlockProps {
 
 
 const PoemBlock: React.FunctionComponent<PoemBlockProps> = ({cost, activitiesPrice, authorpartsPrice}) => {
-    // const {service} = useContext(Context);
     const [poem, setPoem] = useState<IPoem>({} as IPoem);
     const [author, setAuthor] = useState<IAuthor>({} as IAuthor);
-    const [models, setModels] = useState<IModel[]>([]);
-    const [modelAuthor, setModelAuthor] = useState<IModel[]>([]);
-    const [stamps, setStamps] = useState<IStamp[]>([]);
-    const [stampAuthor, setStampAuthor] = useState<IStamp[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [visible, setVisible] = useState<boolean>(false);
     const {id} = useParams<{id: string}>();
@@ -70,18 +64,12 @@ const PoemBlock: React.FunctionComponent<PoemBlockProps> = ({cost, activitiesPri
                     className="poem__name"
                     onClick={() => {navigate(AUTHOR_ROUTE + `/${poem.authorId}`)}} 
                 >
-                    {`${stampAuthor.length ? stampAuthor[0].stamp : ''} ${modelAuthor.length ? modelAuthor[0].model : ''}`}
+                    
                 </div>
                 
                 <Button className="poem__button" variant={"outline-primary"} onClick={() => setVisible(true)}>Редактировать</Button>
                 <Button className="poem__button" variant={"outline-danger"} onClick={removePoem}>Удалить</Button>
             </div>
-            
-            {/* <ModalPoemUpdate 
-                show={visible} 
-                onHide={() => setVisible(false)} 
-                poem={poem}
-            /> */}
         </div>
     );
 };

@@ -1,22 +1,18 @@
 import React, {useState, useEffect, useContext} from 'react';
-import {useNavigate} from 'react-router-dom';
-import { Container, Spinner, Button } from 'react-bootstrap';
+import { Container, Spinner } from 'react-bootstrap';
 import {observer} from 'mobx-react-lite';
 import {Helmet} from "react-helmet";
 
 import List from '../components/List/List';
 import PoemItem from '../components/PoemItem/PoemItem';
-import Statistics from '../components/Statistics/Statistics';
 import SearchPanelPoems from '../components/SearchPanel/SearchPanelPoems';
 import Pageup from '../components/Pageup/Pageup';
-import { IPoem } from '../types/types';
-import { Context } from '../index';
-import { fetchPoems } from '../http/poemsAPI';
 import ModalPoemDetail from '../components/Modals/ModalPoemDetail';
-import PoemEditor from '../components/PoemEditor/PoemEditor';
-import PoemsStore from '../store/PoemsStore';
-import ListItemPoem from '../components/ListItem/ListItem';
+import poemStore from '../store/PoemsStore';
+import { IAuthor, IPoem } from '../types/types';
+import { Context } from '../index';
 import { fetchAuthors } from '../http/authorsAPI';
+import { fetchPoems } from '../http/poemsAPI';
 
 
 const MainPage: React.FC = observer(() => {
@@ -24,6 +20,7 @@ const MainPage: React.FC = observer(() => {
     const [loading, setLoading] = useState<boolean>(true);
     const [visible, setVisible] = useState<boolean>(false);
     const [poem, setPoem] = useState<IPoem>({} as IPoem);
+    const [author, setAuthor] = useState<IAuthor>({} as IAuthor);
     const [poems, setPoems] = useState<IPoem[]>([]);
 
     useEffect(() => {
@@ -44,45 +41,27 @@ const MainPage: React.FC = observer(() => {
             .finally(() => setLoading(false));
     }
 
-    // const poems: IPoem[] = [
-    //     {
-    //         id: 1,
-    //         title: "Title 1",
-    //         content: "dfsdsc ing333",
-    //         html_content: "string string string string333",
-    //         userId: 1,
-    //         authorId: 1,
-    //     },
-    //     {
-    //         id: 2,
-    //         title: "string 22 ",
-    //         content: "sFDGDFGV54354Ving string string333",
-    //         html_content: "string string string string333",
-    //         userId: 1,
-    //         authorId: 1,
-    //     },
-    //     {
-    //         id: 3,
-    //         title: "Title 333",
-    //         content: "stRRTWCC6666 string333",
-    //         html_content: "string string string string333",
-    //         userId: 2,
-    //         authorId: 1,
-    //     },
-    //     {
-    //         id: 4,
-    //         title: "string 4",
-    //         content: "QQQQQQQQQstrin1111111ing string333",
-    //         html_content: "string string string string333",
-    //         userId: 1,
-    //         authorId: 3,
-    //     },
-    // ];
-
     const selectPoem = (item: IPoem) => {
         setPoem(item);
+        poemStore.currentPoem = item;
         setVisible(true)
     };
+
+    const handleSave = () => {
+        // Обновляем список после сохранения
+        fetchPoems()
+            .then(data => {
+                setPoems(data);
+                setVisible(false);
+            })
+            .catch(err => {
+                console.error('Ошибка при обновлении списка:', err);
+            });
+    };
+
+    if (loading) {
+        return <Spinner />
+    }
 
     return (        
         <Container
@@ -93,13 +72,10 @@ const MainPage: React.FC = observer(() => {
                 <meta name="description" content="Список стихотворений" />
             </Helmet>
 
-            <Statistics />
             <SearchPanelPoems poems={poems} />
-            <h1 style={{textAlign: 'center'}}>Список стихотворений:</h1>
             {loading ? <Spinner animation={"border"}/> :
                 <List 
                     items={library.visiblePoems} 
-                    // items={poems} 
                     renderItem={(poem: IPoem) => 
                         <PoemItem 
                             poem={poem} 
@@ -114,6 +90,8 @@ const MainPage: React.FC = observer(() => {
                 showPoem={visible} 
                 onHidePoem={() => setVisible(false)} 
                 poem={poem}
+                author={author}
+                onSave={handleSave}
             />
         </Container>
     );

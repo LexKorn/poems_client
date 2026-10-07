@@ -8,6 +8,7 @@ export default class LibraryStore {
     _selectedAuthor: IAuthor;
     _visibleAuthors: IAuthor[];
     _visiblePoems: IPoem[];
+    _visibleModal: boolean;
     _toggle: boolean;
 
     constructor() {
@@ -20,6 +21,7 @@ export default class LibraryStore {
         };
        this._visibleAuthors = [];
        this._visiblePoems = [];
+       this._visibleModal = false;
        this._toggle = false;
 
        makeAutoObservable(this); 
@@ -39,6 +41,9 @@ export default class LibraryStore {
     };
     setVisiblePoems(visiblePoems: IPoem[]) {
         this._visiblePoems = visiblePoems;
+    };
+    setVisibleModal(bool: boolean) {
+        this._visibleModal = bool;
     };
     setToggle(bool: boolean) {
         this._toggle = bool;
@@ -61,5 +66,8 @@ export default class LibraryStore {
     };
     get toggle() {
         return this._toggle;
+    };
+    get visibleModal() {
+        return this._visibleModal;
     };
 };
