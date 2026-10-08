@@ -1,7 +1,8 @@
-import React, {useState} from 'react';
+import React, {useContext, useState} from 'react';
 import { Container, ListGroup } from 'react-bootstrap';
 import { observer } from 'mobx-react-lite';
 
+import { Context } from '../..';
 import { IPoem, IAuthor } from '../../types/types';
 import ModalPoemDetail from '../Modals/ModalPoemDetail';
 import List from '../List/List';
@@ -16,6 +17,7 @@ interface PoemsListProps {
 
 
 const PoemsList: React.FC<PoemsListProps> = observer(({authorPoems, author}) => {
+    const {library} = useContext(Context);
     const [poem, setPoem] = useState<IPoem>({} as IPoem);
     const [visible, setVisible] = useState<boolean>(false);
 
@@ -25,6 +27,12 @@ const PoemsList: React.FC<PoemsListProps> = observer(({authorPoems, author}) => 
     };
 
     console.log('PoemsList рендерится, стихов:', authorPoems.length);
+
+    // Обновляем через toggle, чтобы AuthorPage перезагрузил данные
+    const handleSave = () => {
+        library.setToggle(!library.toggle); // <-- ТРИГГЕР ОБНОВЛЕНИЯ
+        setVisible(false);
+    };
 
     return (
         <Container>
@@ -49,6 +57,7 @@ const PoemsList: React.FC<PoemsListProps> = observer(({authorPoems, author}) => 
                 onHidePoem={() => setVisible(false)} 
                 poem={poem}
                 author={author}
+                onSave={handleSave}
             />
         </Container>        
     );

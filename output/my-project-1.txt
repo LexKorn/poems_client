@@ -1,0 +1,2592 @@
+----- file: App.tsx -----
+import React, { useContext, useState, useEffect } from "react";
+import {BrowserRouter} from 'react-router-dom';
+import { observer } from "mobx-react-lite";
+import { Spinner } from "react-bootstrap";
+
+import AppRouter from "./components/AppRouter";
+import Header from "./components/Header/Header";
+import { Context } from "./index";
+import { check } from "./http/userAPI";
+
+
+const App = observer(() => {
+    const {users} = useContext(Context);
+    const [loading, setLoading] = useState<boolean>(true);
+
+    useEffect(() => {
+        check()
+            .then(() => {
+                users.setIsAuth(true);
+            })
+            .finally(() => setLoading(false));
+    }, []);
+
+    if (loading) {
+        return <Spinner animation={"border"}/>
+    }
+
+    return (
+        <BrowserRouter>
+            <Header />
+            <AppRouter />
+        </BrowserRouter>
+    );
+});
+
+export default App;-----------------------------------------
+----- file: components\AppRouter.tsx -----
+import React, { useContext } from 'react';
+import {Routes, Route, Navigate} from 'react-router-dom';
+import {observer} from "mobx-react-lite";
+
+import { authRoutes, publicRoutes } from '../routes';
+import { LOGIN_ROUTE, MAIN_ROUTE } from '../utils/consts';
+import { Context } from '../index';
+
+
+const AppRouter: React.FC = observer(() => { 
+    const {users} = useContext(Context);
+
+    return (
+        <Routes>
+            {users.isAuth ? 
+                authRoutes.map(({path, Component}) => 
+                    <Route key={path} path={path} element={<Component />} />
+                ):
+                publicRoutes.map(({path, Component}) => 
+                    <Route key={path} path={path} element={<Component />} />
+                )
+            }
+            {users.isAuth ?
+                <Route path='*' element={<Navigate to={MAIN_ROUTE} />} />
+                :
+                <Route path='*' element={<Navigate to={LOGIN_ROUTE} />} />
+            }
+        </Routes>
+    );
+});
+
+export default AppRouter;-----------------------------------------
+----- file: components\AuthorBlock\AuthorBlock.tsx -----
+// src/components/AuthorBlock/AuthorBlock.tsx
+import React, {useContext, useState, useEffect} from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { Spinner, Button } from 'react-bootstrap';
+import {Helmet} from "react-helmet";
+
+import { IAuthor } from '../../types/types';
+import { AUTHORS_ROUTE } from '../../utils/consts';
+import { deleteAuthor, fetchOneAuthor } from '../../http/authorsAPI';
+import { fetchPoems } from '../../http/poemsAPI';
+import {Context} from '../../index';
+import ModalAuthorUpdate from '../Modals/ModalAuthorUpdate';
+import ModalPoemAdd from '../Modals/ModalPoemAdd'; 
+
+import './authorBlock.sass';
+
+const AuthorBlock: React.FunctionComponent = () => {
+    const {library} = useContext(Context);
+    const [author, setAuthor] = useState<IAuthor>({} as IAuthor);
+    const [loading, setLoading] = useState<boolean>(true);
+    const [visibleUpdate, setVisibleUpdate] = useState<boolean>(false);
+    const [visibleAddPoem, setVisibleAddPoem] = useState<boolean>(false);
+    const [quantity, setQuantity] = useState<number>(0);
+    const {id} = useParams<{id: string}>();
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        const loadAuthorData = async () => {
+            setLoading(true);
+            try {
+                const authorData = await fetchOneAuthor(Number(id));
+                setAuthor(authorData);
+                const poemsData = await fetchPoems();
+                const authorPoemsCount = poemsData.filter(
+                    (item: { authorId: number }) => Number(item.authorId) === Number(id)
+                ).length;
+                setQuantity(authorPoemsCount);
+            } catch (error) {
+                console.error('Ошибка загрузки:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        
+        loadAuthorData();
+    }, [id, library.toggle]); 
+
+    const removeAuthor = async () => {
+        if (window.confirm('Вы действительно хотите удалить автора? Все стихи, связанные с ним, будут удалены.')) {
+            try {
+                await deleteAuthor(author.id);
+                const updatedAuthors = library.authors.filter(a => a.id !== author.id);
+                library.setAuthors(updatedAuthors);
+                library.setToggle(!library.toggle); 
+                navigate(AUTHORS_ROUTE);
+            } catch (error) {
+                console.error('Ошибка удаления:', error);
+                alert('Не удалось удалить автора');
+            }
+        }        
+    };
+
+    const handlePoemAdded = () => {
+        library.setToggle(!library.toggle);
+    };
+
+    if (loading) {
+        return <Spinner animation={"border"}/>
+    }
+
+    return (
+        <div>
+            <Helmet>
+                <title>{`${author.name}`}</title>
+                <meta name="description" content={`Страничка ${author.name}`} />
+            </Helmet>
+
+            <div className="author">
+                <div className="author__name">{author.name}</div>
+                <div className="author__description">количество стихотворений: <span>{quantity}</span></div>
+                <Button className="author__button" variant={"outline-primary"} onClick={() => setVisibleUpdate(true)}>
+                    Редактировать
+                </Button>
+                <Button className="author__button" variant={"outline-danger"} onClick={removeAuthor}>
+                    Удалить
+                </Button>
+                <Button 
+                    className="author__button" 
+                    variant={"outline-success"} 
+                    onClick={() => setVisibleAddPoem(true)}
+                >
+                    Добавить стихотворение
+                </Button>
+            </div>
+
+            <ModalAuthorUpdate
+                show={visibleUpdate} 
+                onHide={() => setVisibleUpdate(false)} 
+                author={author}
+            />
+            
+            <ModalPoemAdd
+                show={visibleAddPoem}
+                onHide={() => setVisibleAddPoem(false)}
+                authorId={author.id}
+                onPoemAdded={handlePoemAdded}
+            />
+        </div>
+    );
+};
+
+export default AuthorBlock;-----------------------------------------
+----- file: components\AuthorBlock\authorBlock.sass -----
+.author
+    width: 60%
+    margin: 100px auto 10px
+    &__name
+        font-size: 32px
+        font-weight: bold
+        color: whitesmoke
+    &__description
+        margin-top: 20px
+        font-size: 24px
+        text-align: left
+        color: whitesmoke
+        span
+            color: whitesmoke
+    &__button
+        margin-top: 30px
+        margin-right: 20px
+
+@media ( max-width: 575px )
+    .author
+        width: 90%
+        &__name
+            font-size: 24px
+        &__description
+            font-size: 20px
+-----------------------------------------
+----- file: components\AuthorItem\AuthorItem.tsx -----
+import React from 'react';
+import { Card } from 'react-bootstrap';
+
+import { IAuthor } from '../../types/types';
+
+import './authorItem.sass';
+
+interface AuthorItemProps {
+    author: IAuthor;
+    onClick: (author: IAuthor) => void;
+};
+
+
+const AuthorItem: React.FC<AuthorItemProps> = ({author, onClick}) => {    
+        return (
+            <Card 
+                className="author-card shadow"
+                onClick={() => onClick(author)}
+            >
+                <div className="author-card__owner" >{author.name}</div>
+            </Card>
+        );
+};
+
+export default AuthorItem;-----------------------------------------
+----- file: components\AuthorItem\authorItem.sass -----
+.author-card
+    display: flex
+    flex-direction: row
+    margin-top: 15px
+    padding: 10px
+    font-size: 18px
+    line-height: 35px
+    justify-content: space-between
+    cursor: pointer
+    &__author
+        font-weight: bold
+
+@media (max-width: 375px)
+    .author-card
+        flex-direction: column-----------------------------------------
+----- file: components\CreateUpdate\CUAuthor.tsx -----
+import React, { useContext } from 'react';
+import {Container, Button, Form} from 'react-bootstrap';
+import { observer } from 'mobx-react-lite';
+
+import { Context } from '../../index';
+
+interface CUAuthorProps {
+    id: number;
+    name: string;
+    setName: (name: string) => void;
+    handler: (id: number, name: string) => Promise<unknown>;
+    title: string;
+    btnName: string;
+};
+
+
+const CUAuthor: React.FC<CUAuthorProps> = observer(({id, name, setName, handler, title, btnName}) => {
+    const {library} = useContext(Context);
+
+    const onClick = () => {
+        if (!name.trim()) {
+            return alert('Имя автора обязательно для заполнения');
+        }
+
+        if (btnName === 'Добавить') {
+            // @ts-ignore 
+            handler(name)
+                .then(() => {
+                    library.setVisibleModal(false);
+                    window.location.reload();
+                })
+                .catch(err => alert(err.response.data.message));
+        } else {
+            handler(id, name)
+                .then(() => {
+                    library.setVisibleModal(false);
+                    window.location.reload();
+                })
+                .catch(err => alert(err.response.data.message));
+        }
+    };
+
+    return (
+        <Container className="d-flex justify-content-center">
+            <div>
+                <h1>{title}</h1>
+                <Form>
+                    <Form.Control
+                        className="mt-3"
+                        value={name}
+                        onChange={e => setName(e.target.value)}
+                        placeholder="Введите автора"
+                    />
+                </Form>
+                <Button variant={btnName === 'Добавить' ? "outline-success" : "outline-primary"} onClick={onClick} className="mt-3">{btnName}</Button>           
+            </div>
+        </Container>
+    );
+});
+
+export default CUAuthor;-----------------------------------------
+----- file: components\CreateUpdate\CUItem.tsx -----
+import React, {useRef} from 'react';
+import {Container, Button, Form } from 'react-bootstrap';
+
+interface CUItemProps {
+    id: number;
+    name: string;
+    price: number;
+    setName: (name: string) => void;
+    setPrice: (price: number) => void;
+    poemId: number;
+    handler: (id: number, name: string, price: number, poemId: number) => Promise<unknown>;
+    title: string;
+    btnName: string;
+    onHide: () => void;
+};
+
+
+const CUItem: React.FC<CUItemProps> = ({id, name, setName, price, setPrice, poemId, handler, title, btnName, onHide}) => {
+    const inputRef = useRef(null);
+
+    const onClick = () => {
+        if (!name.trim() || !price) {
+            return alert('Поля обязательны для заполнения');
+        }
+
+        if (btnName === 'Добавить') {
+            // @ts-ignore 
+            handler(name, price, poemId)
+                .then(() => {
+                    setName('');
+                    setPrice(0);
+                    onHide();
+                })
+                .catch(err => alert(err.response.data.message));
+        } else {
+            handler(id, name, price, poemId)
+                .then(() => {
+                    setName('');
+                    setPrice(0);
+                    onHide();
+                })
+                .catch(err => alert(err.response.data.message));
+        }
+    };
+
+    const handleInputClick = () => {
+        //@ts-ignore
+        inputRef.current.select();
+    };
+
+    let toggle: boolean = false;
+
+    if (title === 'Добавить работу' || title === 'Обновить работу') {
+        toggle = true;
+    }
+
+
+    return (
+        <Container className="d-flex flex-column justify-content-center">
+            <h1 style={{textAlign: 'center'}}>{title}</h1>
+            <Form>
+                <label htmlFor="name" className="mt-3">{toggle ? 'Работа' : 'Запчасть'}</label> 
+                <Form.Control
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    placeholder={toggle ? 'Введите название работы' : 'Введите название запчасти'}
+                />
+                <label htmlFor="name" className="mt-3">Стоимость</label> 
+                <Form.Control
+                    ref={inputRef}
+                    onClick={handleInputClick}
+                    value={price}
+                    type="number"
+                    onChange={e => setPrice(+e.target.value)}
+                    placeholder={toggle ? 'Введите стоимость работы' : 'Введите стоимость запчасти'}
+                />
+            </Form>
+            <Button variant={"outline-dark"} onClick={onClick} className="mt-3" style={{width: 100}}>{btnName}</Button>
+        </Container>
+    );
+};
+
+export default CUItem;-----------------------------------------
+----- file: components\Header\Header.tsx -----
+import React, {useState, useEffect, useContext} from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
+import { Button } from 'react-bootstrap';
+import {observer} from 'mobx-react-lite';
+
+import { MAIN_ROUTE, AUTHORS_ROUTE } from "../../utils/consts";
+import { Context } from '../../index';
+
+import './header.sass';
+
+
+const Header: React.FC = observer(() => {
+    const location = useLocation();
+    const [classMenu, setClassMenu] = useState<string>('');
+    const {users} = useContext(Context);
+    const {library} = useContext(Context);
+    const [quantityAuthors, setQuantityAuthors] = useState<number>(0);
+    const [quantityPoems, setQuantityPoems] = useState<number>(0);
+
+    useEffect(() => {
+        setClassMenu('');
+    }, [location.pathname]);
+
+    useEffect(() => {
+        setQuantityAuthors(library.authors.length);
+        setQuantityPoems(library.poems.length);
+    }, [library.authors, library.poems]);
+
+    const menuHandler = () => {
+        classMenu === '' ? setClassMenu('open-menu') : setClassMenu('');
+    };
+
+    const logOut = () => {
+        users.setIsAuth(false);
+        localStorage.clear();
+    };
+
+    return (
+        <>
+            {users.isAuth ?
+                <div className='header'>
+                    <div className={"header__menu-burger" + ' ' + classMenu} onClick={() => menuHandler()}>
+                        <span></span>
+                    </div>
+
+                    <nav className={'header__nav' + ' ' + classMenu}>
+                        <ul className="header__menu">
+                            <li className="header__menu_item">
+                                <NavLink to={MAIN_ROUTE} className={location.pathname === MAIN_ROUTE ? "active" : ''} >
+                                    СТИХОТВОРЕНИЯ ( {quantityPoems} )
+                                </NavLink>
+                            </li>
+                            <li className="header__menu_item">
+                                <NavLink to={AUTHORS_ROUTE} className={location.pathname === AUTHORS_ROUTE ? "active" : ''} >
+                                    АВТОРЫ ( {quantityAuthors} )
+                                </NavLink>
+                            </li>
+                            <li className="header__menu_item">
+                                <Button 
+                                    variant={"outline-secondary"} 
+                                    onClick={() => logOut()} 
+                                    className="ms-2 nav-btn"
+                                    >Выйти
+                                </Button> 
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            :
+                <div></div>
+            }
+        </>
+    );
+});
+
+export default Header;-----------------------------------------
+----- file: components\Header\header.sass -----
+.header
+    position: fixed
+    top: 0
+    width: 100%
+    height: 60px
+    z-index: 1000
+    background-color: #222222
+    &__menu
+        height: 40px
+        display: flex
+        justify-content: space-around
+        align-items: center
+        margin: 10px 50px 0
+        list-style-type: none
+        padding-left: 0
+        &_item
+            font-size: 20px
+            a
+                display: contents
+                padding: 0 30px
+                font-size: 20px
+                font-weight: bold
+                &:link, &:visited
+                    color: gray
+                    text-decoration: none
+                &:hover
+                    color: #b71c1c
+                &.active
+                    color: #ff1744
+
+@media (max-width: 768px) // burger-menu
+    .header
+        &__nav
+            display: block
+            position: absolute
+            width: 100%
+            background-color: #222222
+            transition: all 0.4s ease
+            left: -100%
+            &.open-menu
+                left: 0
+        &__menu
+            display: block
+            height: unset
+            &_item
+                margin: 20px
+                font-size: 14px
+        &__menu-burger
+            position: relative
+            width: 40px
+            height: 35px
+            display: block
+            margin: 10px
+            z-index: 100
+            cursor: pointer
+            span, &:after, &:before
+                height: 3px
+                width: 100%
+                position: absolute
+                background: #515758
+                margin: 0 auto
+            span
+                top: 16px
+            &:after, &:before
+                content: ''
+            &:after
+                bottom: 5px
+            &:before
+                top: 5px
+            &.open-menu
+                span
+                    opacity: 0
+                    transition: 0.5s
+                &:after
+                    transform: rotate(-38deg)
+                    bottom: 16px
+                    transition: 0.4s
+                &:before
+                    transform: rotate(38deg)
+                    top: 16px
+                    transition: 0.4s
+-----------------------------------------
+----- file: components\ListItemPoem\ListItemPoem.tsx -----
+import React from 'react';
+import { Card } from 'react-bootstrap';
+
+import { IPoem } from '../../types/types';
+
+interface ListItemPoemProps {
+    item: IPoem;
+    onClick: (poem: IPoem) => void;
+    onEdit: (poem: IPoem) => void;
+};
+
+
+const ListItemPoem: React.FC<ListItemPoemProps> = ({item, onClick, onEdit}) => {
+    return (
+        <Card 
+            className="d-flex justify-content-between shadow" 
+            style={{padding: 10, marginTop: 15, flexDirection: 'row', fontSize: 18, lineHeight: '35px', cursor: 'pointer'}}
+        >
+            <div onClick={() => onClick(item)} style={{flex: 1}}>
+                {item.title}
+            </div>
+            <button 
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit(item);
+                }}
+                className="btn btn-sm btn-outline-primary ms-2"
+            >
+                Редактировать
+            </button>
+        </Card>   
+    );
+};
+
+export default ListItemPoem;-----------------------------------------
+----- file: components\ListItemPoem\listItemPoem.sass -----
+.quote-item
+    display: grid
+    grid-template-columns: 88% 10%
+    column-gap: 2%
+    margin-top: 25px
+    padding: 10px
+    font-size: 18px
+    line-height: 35px
+    font-style: italic
+    background-color: #333333
+    border-color: #555555
+    &__quote
+        text-align: justify
+    &__author
+        text-align: right
+    &__icon
+        margin-left: 10px
+        cursor: pointer
+        &:first-child:hover
+            color: #0277bd 
+        &:last-child:hover
+            color: #e53935 
+            
+@media (max-width: 991px)
+    .list-item
+        grid-template-columns: 84% 14%-----------------------------------------
+----- file: components\ListItem\ListItem.tsx -----
+import React, {useState} from 'react';
+import { Card } from 'react-bootstrap';
+
+import { IPoem } from '../../types/types';
+
+import './listItem.sass';
+
+interface ListItemProps {
+    item: IPoem;
+    onDelete: (item: IPoem) => void;
+    onEdit: (item: IPoem) => void;
+};
+
+
+const ListItem: React.FC<ListItemProps> = ({item, onDelete, onEdit}) => {
+    const [hover, setHover] = useState<boolean>(false);
+
+    return (
+        <Card 
+            className="list-item shadow"
+            onMouseOver={() => setHover(true)}
+            onMouseLeave={() => setHover(false)}
+        >
+            <div>
+                <div>{item.title}</div>
+            </div>
+            <div style={{display: hover ? 'block' : 'none'}}>
+                <i className="bi bi-pencil-fill list-item__icon" onClick={() => onEdit(item)}></i>
+                <i className="bi bi-trash3-fill list-item__icon" onClick={() => onDelete(item)}></i>
+            </div>
+        </Card>      
+    );
+};
+
+export default ListItem;-----------------------------------------
+----- file: components\ListItem\listItem.sass -----
+.list-item
+    display: grid
+    grid-template-columns: 88% 10%
+    column-gap: 2%
+    margin-top: 15px
+    padding: 10px
+    font-size: 18px
+    line-height: 35px
+    &__icon
+        margin-left: 10px
+        cursor: pointer
+        &:first-child:hover
+            color: #0277bd 
+        &:last-child:hover
+            color: #e53935 
+    &.poem-card
+        cursor: pointer
+        display: flex
+        justify-content: space-between
+            
+@media (max-width: 991px)
+    .list-item
+        grid-template-columns: 84% 14%-----------------------------------------
+----- file: components\List\List.tsx -----
+import React from 'react';
+
+import './list.sass';
+
+interface ListProps<T> {
+    items: T[];
+    renderItem: (item: T) => React.ReactNode;
+};
+
+
+export default function List<T> (props: ListProps<T>) {
+    return (
+        <div className="list">
+            {!props.items.length ? 
+                <div className="list__empty">Здесь пока ничего нет...</div>
+            :
+                props.items.map(props.renderItem)
+            }           
+        </div>
+    );
+};-----------------------------------------
+----- file: components\List\list.sass -----
+.list
+    width: 70%
+    margin: 0 auto
+    &__empty
+        font-size: 20px
+
+@media ( max-width: 768px )
+    .list
+        width: 100%-----------------------------------------
+----- file: components\Modals\ModalAuthorAdd.tsx -----
+import React, {useState, useContext} from 'react';
+import {Modal, Button} from 'react-bootstrap';
+
+import { createAuthor } from '../../http/authorsAPI';
+import { Context } from '../../index';
+import CUAuthor from '../CreateUpdate/CUAuthor';
+
+interface ModalPoemAddProps {
+    show: boolean;
+    onHide: () => void;
+};
+
+
+const ModalAuthorAdd: React.FC<ModalPoemAddProps> = ({show, onHide}) => {
+    const [name, setName] = useState<string>('');
+    const {library} = useContext(Context);
+    
+    return (
+        <Modal
+            show={show}
+            onHide={onHide}
+            // @ts-ignore
+            size="md"
+            centered
+            >
+            <Modal.Body>
+                <CUAuthor 
+                    id={0}
+                    name={name}
+                    setName = {setName}
+                    // @ts-ignore
+                    handler={createAuthor}
+                    title='Добавить автора'
+                    btnName='Добавить'
+                    show={show}
+                    onHide={onHide}
+                />
+            </Modal.Body>
+            <Modal.Footer>
+                <Button variant={"outline-secondary "} onClick={() => library.setVisibleModal(false)}>Закрыть</Button>
+            </Modal.Footer>
+        </Modal>
+    );
+};
+
+export default ModalAuthorAdd;-----------------------------------------
+----- file: components\Modals\ModalAuthorUpdate.tsx -----
+import React, {useState, useEffect} from 'react';
+import {Modal, Button} from 'react-bootstrap';
+
+import { updateAuthor } from '../../http/authorsAPI';
+import { IAuthor } from '../../types/types';
+import CUAuthor from '../CreateUpdate/CUAuthor';
+
+interface ModalAuthorUpdateProps {
+    show: boolean;
+    onHide: () => void;
+    author: IAuthor;
+};
+
+
+const ModalAuthorUpdate: React.FC<ModalAuthorUpdateProps> = ({show, onHide, author}) => {
+    const [name, setName] = useState<string>('');
+
+    useEffect(() => {
+        setName(author.name);
+    }, [author]);
+    
+    return (
+        <Modal
+            show={show}
+            onHide={onHide}
+            // @ts-ignore
+            size="md"
+            centered
+            >
+            <Modal.Body>
+                <CUAuthor 
+                    id={author.id}
+                    name={name}
+                    setName = {setName}
+                    // @ts-ignore
+                    handler={updateAuthor}
+                    title='Обновить автора'
+                    btnName='Обновить'
+                />
+            </Modal.Body>
+            <Modal.Footer>
+                <Button variant={"outline-secondary "} onClick={onHide}>Закрыть</Button>
+            </Modal.Footer>
+        </Modal>
+    );
+};
+
+export default ModalAuthorUpdate;-----------------------------------------
+----- file: components\Modals\ModalPoemAdd.tsx -----
+// src/components/Modals/ModalPoemAdd.tsx
+import React, { useState } from 'react';
+import { Modal, Form, Button } from 'react-bootstrap';
+import { observer } from 'mobx-react-lite';
+import { createPoem } from '../../http/poemsAPI';
+
+interface ModalPoemAddProps {
+    show: boolean;
+    onHide: () => void;
+    authorId: number;
+    onPoemAdded?: () => void;
+}
+
+const ModalPoemAdd: React.FC<ModalPoemAddProps> = observer(({ show, onHide, authorId, onPoemAdded }) => {
+    const [title, setTitle] = useState('');
+    const [content, setContent] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    const handleSubmit = async () => {
+        if (!title.trim() || !content.trim()) {
+            alert('Заполните заголовок и содержание стиха');
+            return;
+        }
+        
+        setLoading(true);
+        try {
+            await createPoem({
+                title: title.trim(),
+                content: content.trim(),
+                html_content: content.trim(),
+                //@ts-ignore
+                authorId: authorId
+            });
+            
+            setTitle('');
+            setContent('');
+            onHide();
+            
+            // Вызываем колбэк для обновления списка
+            if (onPoemAdded) {
+                onPoemAdded();
+            }
+        } catch (error) {
+            console.error('Ошибка создания стиха:', error);
+            alert('Не удалось создать стих');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Modal show={show} onHide={onHide} size="lg">
+            <Modal.Header closeButton>
+                <Modal.Title>Добавить стихотворение</Modal.Title>
+            </Modal.Header>
+            <Modal.Body>
+                <Form>
+                    <Form.Group className="mb-3">
+                        <Form.Label>Название</Form.Label>
+                        <Form.Control
+                            type="text"
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            placeholder="Введи название"
+                        />
+                    </Form.Group>
+                    <Form.Group className="mb-3">
+                        <Form.Label>Содержание</Form.Label>
+                        <Form.Control
+                            as="textarea"
+                            rows={10}
+                            value={content}
+                            onChange={(e) => setContent(e.target.value)}
+                            placeholder="Введи текст стихотворения"
+                        />
+                    </Form.Group>
+                </Form>
+            </Modal.Body>
+            <Modal.Footer>
+                <Button variant="secondary" onClick={onHide}>
+                    Отмена
+                </Button>
+                <Button variant="primary" onClick={handleSubmit} disabled={loading}>
+                    {loading ? 'Сохранение...' : 'Сохранить'}
+                </Button>
+            </Modal.Footer>
+        </Modal>
+    );
+});
+
+export default ModalPoemAdd;-----------------------------------------
+----- file: components\Modals\ModalPoemDetail.tsx -----
+import React from 'react';
+import {observer} from 'mobx-react-lite';
+import { Modal } from 'react-bootstrap';
+
+import { IAuthor, IPoem } from '../../types/types';
+import PoemEditor from '../PoemEditor/PoemEditor';
+
+interface ModalPoemDetailProps {
+    showPoem: boolean;
+    onHidePoem: () => void;
+    poem: IPoem;
+    author: IAuthor;
+    onEdit?: (poem: IPoem) => void;
+    onSave?: () => void;
+};
+
+
+const ModalPoemDetail: React.FunctionComponent<ModalPoemDetailProps> = observer(({showPoem, onHidePoem, poem, author, onEdit, onSave}) => {
+    return (
+        <Modal
+            show={showPoem}
+            onHide={onHidePoem}
+            fullscreen="xxl"
+            >
+            <Modal.Header closeButton>
+                <Modal.Title>
+                    {poem.id ? 'Редактирование стиха' : 'Новый стих'}
+                </Modal.Title>
+            </Modal.Header>
+            <Modal.Body>
+                <PoemEditor 
+                    poem={poem}
+                    author={author}
+                    onSave={() => {
+                        if (onSave) onSave();
+                        onHidePoem();
+                    }}
+                />
+            </Modal.Body>
+        </Modal>
+    );
+});
+
+export default ModalPoemDetail;-----------------------------------------
+----- file: components\Pageup\Pageup.tsx -----
+import React, {useState, useEffect} from 'react';
+import {useLocation} from 'react-router-dom';
+
+import { MAIN_ROUTE, AUTHORS_ROUTE } from "../../utils/consts";
+
+import './pageup.sass';
+
+
+const Pageup: React.FC = () => {
+    const [scrollTop, setScrollTop] = useState<number>(0);
+    const location = useLocation();
+
+    const handleScroll = () => {
+        const position = window.scrollY;
+        setScrollTop(position);
+    };
+
+    useEffect(() => {
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        return () => {
+            window.removeEventListener('scroll', handleScroll);
+        };
+    }, []);
+
+    return (
+        <a href="#root" className='pageup' style={{display : scrollTop > 500 ? 'block' : 'none' }}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="110" height="110" viewBox="0 0 110 110" fill="none">
+                <g filter="url(#filter0_d_17_399)">
+                    <g clipPath="url(#clip0_17_399)">
+                    <rect x="24" y="86" width="62" height="62" rx="31" transform="rotate(-90 24 86)" fill="white" opacity="0.4"/>
+                    <path d="M39.5 60.1667L43.1425 63.8092L55 51.9775L66.8575 63.8092L70.5 60.1667L55 44.6667L39.5 60.1667Z" fill="#282828" opacity="0.4"/>
+                    </g>
+                </g>
+                <defs>
+                    <filter id="filter0_d_17_399" x="0" y="0" width="110" height="110" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+                    <feFlood floodOpacity="0" result="BackgroundImageFix"/>
+                    <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+                    <feOffset/>
+                    <feGaussianBlur stdDeviation="12"/>
+                    <feComposite in2="hardAlpha" operator="out"/>
+                    <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.2 0"/>
+                    <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_17_399"/>
+                    <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_17_399" result="shape"/>
+                    </filter>
+                    <clipPath id="clip0_17_399">
+                    <rect x="24" y="86" width="62" height="62" rx="31" transform="rotate(-90 24 86)" fill="white" />
+                    </clipPath>
+                </defs>
+            </svg>
+        </a>
+    );
+};
+
+export default Pageup;-----------------------------------------
+----- file: components\Pageup\pageup.sass -----
+.pageup
+    width: 40px //62px
+    height: 40px //62px
+    position: fixed
+    bottom: 96px
+    right: 81px
+    z-index: 100
+    &:hover
+        svg 
+            path
+                fill: #b71c1c
+                opasity: unset-----------------------------------------
+----- file: components\PoemEditor\PoemEditor.tsx -----
+import React, { useState, useRef, useEffect } from 'react';
+import { observer } from 'mobx-react-lite';
+import { IAuthor, IPoem } from '../../types/types';
+import { deletePoem } from '../../http/poemsAPI';
+import poemStore from '../../store/PoemsStore';
+
+import "./poemEditor.sass";
+
+interface PoemEditorProps {
+  poem: IPoem;
+  author: IAuthor
+  onSave?: () => void;
+}
+
+const PoemEditor: React.FC<PoemEditorProps> = observer(({poem, author, onSave}) => {
+  const [title, setTitle] = useState(poem?.title || '');
+  const [authorId, setAuthorId] = useState(poem?.authorId || 0);
+  const [content, setContent] = useState(poem?.content || '');
+  const [htmlContent, setHtmlContent] = useState(poem?.html_content || '');
+  const editorRef = useRef<HTMLDivElement>(null);
+
+  // Определяем, редактируем ли мы существующий стих
+  const isEditing = poem?.id && poem.id > 0;
+
+  // Синхронизируем состояние с пропсом poem
+  useEffect(() => {
+    setTitle(poem?.title || '');
+    setAuthorId(poem?.authorId || 0);
+    setContent(poem?.content || '');
+    setHtmlContent(poem?.html_content || '');
+    
+    if (editorRef.current) {
+      editorRef.current.innerHTML = poem?.html_content || poem?.content || '';
+    }
+
+    // Важно: синхронизируем poemStore.currentPoem с переданным poem
+    if (poem?.id) {
+      poemStore.currentPoem = poem;
+    } else {
+      poemStore.currentPoem = null;
+    }
+  }, [poem]); 
+
+  const formatText = (command: string, value?: string) => {
+    document.execCommand(command, false, value);
+    updateContent();
+  };
+
+  const updateContent = () => {
+    if (editorRef.current) {
+      const html = editorRef.current.innerHTML;
+      const text = editorRef.current.innerText;
+      setHtmlContent(html);
+      setContent(text);
+    }
+  };
+
+  const handleInput = () => {
+    updateContent();
+  };
+
+  const handleSave = async () => {
+    if (!editorRef.current) return;
+    
+    const currentHtml = editorRef.current.innerHTML;
+    const currentText = editorRef.current.innerText;
+    
+    if (!currentText.trim() && !title.trim()) {
+      alert('Стих не может быть пустым');
+      return;
+    }
+    
+    try {
+      if (isEditing) {
+        // Обновляем существующий стих
+        await poemStore.updatePoem(poem.id, {
+          title: title.trim(),
+          content: currentText,
+          html_content: currentHtml,
+          authorId: authorId
+        });
+      } else {
+        // Создаем новый стих
+        await poemStore.createPoem({
+          title: title.trim(),
+          content: currentText,
+          html_content: currentHtml,
+          authorId: authorId
+        });
+      }
+      
+      if (onSave) {
+        onSave();
+      }
+    } catch (error) {
+      console.error('Ошибка при сохранении:', error);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (poem?.id && window.confirm('Удалить этот стих?')) {
+      try {
+        await deletePoem(poem.id);
+        poemStore.clearCurrentPoem();
+        if (onSave) onSave();
+      } catch (error) {
+        console.error('Ошибка при удалении:', error);
+      }
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      document.execCommand('insertParagraph', false);
+    }
+  };
+
+  // Проверяем, есть ли у нас стих для редактирования
+  const currentPoem = poemStore.currentPoem || poem;
+
+  return (
+    <div className="poem-editor">
+        <div className="poem-editor__toolbar mb-2">
+          <button 
+            className="btn btn-sm btn-outline-secondary me-2"
+            onClick={() => formatText('bold')}
+            title="Жирный"
+            type="button"
+          >
+            <strong>B</strong>
+          </button>
+          <button 
+            className="btn btn-sm btn-outline-secondary me-2"
+            onClick={() => formatText('italic')}
+            title="Курсив"
+            type="button"
+          >
+            <em>I</em>
+          </button>
+          <button 
+            className="btn btn-sm btn-outline-secondary me-2"
+            onClick={() => formatText('underline')}
+            title="Подчеркнутый"
+            type="button"
+          >
+            <u>U</u>
+          </button>
+          <button 
+            className="btn btn-sm btn-outline-secondary me-2"
+            onClick={() => formatText('insertUnorderedList')}
+            title="Маркированный список"
+            type="button"
+          >
+            • List
+          </button>
+          <button 
+            className="btn btn-sm btn-outline-secondary me-2"
+            onClick={() => formatText('insertOrderedList')}
+            title="Нумерованный список"
+            type="button"
+          >
+            1. List
+          </button>
+          <button 
+            className="btn btn-sm btn-outline-secondary me-2"
+            onClick={() => formatText('formatBlock', '<p>')}
+            title="Абзац"
+            type="button"
+          >
+            ¶
+          </button>
+          <button 
+            className="btn btn-sm btn-outline-secondary me-2"
+            onClick={() => formatText('indent')}
+            title="Увеличить отступ"
+            type="button"
+          >
+            ↳
+          </button>
+          <button 
+            className="btn btn-sm btn-outline-secondary"
+            onClick={() => formatText('outdent')}
+            title="Уменьшить отступ"
+            type="button"
+          >
+            ↲
+          </button>
+        </div>
+
+        <div>{author.name}</div>
+        <div>author.name</div>
+
+      <div className="poem-editor__title mb-3">
+        <input
+          type="text"
+          className="form-control"
+          placeholder="Заголовок стиха"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+      </div>
+
+      <div 
+        ref={editorRef}
+        className="poem-editor__content form-control"
+        contentEditable
+        onInput={handleInput}
+        onKeyDown={handleKeyDown}
+        style={{ 
+          minHeight: '300px',
+          padding: '1rem',
+          whiteSpace: 'pre-wrap',
+          overflowWrap: 'break-word',
+          fontFamily: 'inherit',
+          fontSize: '16px',
+          lineHeight: '1.5'
+        }}
+        placeholder="Начните вводить текст стиха..."
+        suppressContentEditableWarning={true}
+      />
+        <div className="poem-editor__actions mt-3">
+          <button 
+            className="btn btn-primary me-2"
+            onClick={handleSave}
+            disabled={poemStore.isLoading}
+            type="button"
+          >
+            {poemStore.isLoading 
+              ? 'Сохранение...' 
+              : poemStore.currentPoem?.id ? 'Обновить' : 'Создать'}
+          </button>
+          {poemStore.currentPoem?.id && (
+            <button 
+              className="btn btn-outline-danger"
+              onClick={handleDelete}
+              type="button"
+            >
+              Удалить
+            </button>
+          )}
+        </div>
+
+      {poemStore.error && (
+        <div className="alert alert-danger mt-3">
+          {poemStore.error}
+        </div>
+      )}
+    </div>
+  );
+});
+
+export default PoemEditor;-----------------------------------------
+----- file: components\PoemEditor\poemEditor.sass -----
+.poem-editor
+  height: 100%
+  display: flex
+  flex-direction: column
+
+  &__toolbar
+    display: flex
+    flex-wrap: wrap
+    gap: 8px
+    padding: 12px
+    background-color: #222222
+    border: 1px solid #dee2e6
+    border-radius: 8px 8px 0 0
+    margin-bottom: -1px
+    z-index: 2
+    position: relative
+
+    button
+      min-width: 36px
+      height: 36px
+      display: inline-flex
+      align-items: center
+      justify-content: center
+      border: 1px solid #ced4da
+      background: white
+      color: #495057
+      border-radius: 4px
+      cursor: pointer
+      transition: all 0.2s
+      font-size: 14px
+
+      &:hover
+        background-color: #e9ecef
+        border-color: #adb5bd
+        transform: translateY(-1px)
+
+      &:active
+        transform: translateY(0)
+
+      strong,
+      em,
+      u
+        font-style: normal
+        text-decoration: none
+
+  &__title
+    margin-bottom: 15px
+
+    input
+      font-size: 1.5rem
+      font-weight: 600
+      border: 1px solid #dee2e6
+      border-radius: 0
+      padding: 0.75rem 1rem
+      background: #222222
+      color: whitesmoke
+      transition: border-color 0.2s
+
+      &:focus
+        border-color: #86b7fe
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25)
+        outline: none
+        background: #222222
+        color: whitesmoke
+
+  &__content
+    flex: 1
+    border: 1px solid #dee2e6
+    border-radius: 0 0 8px 8px
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', sans-serif
+    font-size: 16px
+    line-height: 1.6
+    padding: 1rem
+    resize: none
+    outline: none
+    min-height: 400px
+    overflow-y: auto
+    transition: border-color 0.2s
+    background: #222222
+    color: whitesmoke
+
+    &:focus
+      border-color: #86b7fe
+      box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25)
+      background: #222222
+      color: whitesmoke
+
+    // Стили для contenteditable элемента
+    &[contenteditable="true"]:empty:before
+      content: attr(placeholder)
+      color: #6c757d
+      pointer-events: none
+
+    // Стили форматирования внутри редактора
+    p
+      margin-bottom: 1em
+      text-indent: 1.5em
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6
+      margin-top: 1.5em
+      margin-bottom: 0.5em
+      font-weight: 600
+      line-height: 1.2
+
+    h1
+      font-size: 2em
+
+    h2
+      font-size: 1.5em
+
+    h3
+      font-size: 1.25em
+
+    ul,
+    ol
+      padding-left: 2em
+      margin-bottom: 1em
+
+    li
+      margin-bottom: 0.5em
+
+    ul
+      list-style-type: disc
+
+    ol
+      list-style-type: decimal
+
+    strong
+      font-weight: bold
+
+    em
+      font-style: italic
+
+    u
+      text-decoration: underline
+
+    blockquote
+      border-left: 4px solid #dee2e6
+      padding-left: 1em
+      margin-left: 0
+      margin-right: 0
+      color: #6c757d
+      font-style: italic
+
+    pre
+      background-color: #f8f9fa
+      border: 1px solid #dee2e6
+      border-radius: 4px
+      padding: 1em
+      font-family: 'Courier New', monospace
+      overflow-x: auto
+
+    code
+      background-color: #f8f9fa
+      padding: 0.2em 0.4em
+      border-radius: 3px
+      font-family: 'Courier New', monospace
+      font-size: 0.9em
+
+    // Стили для скроллбара в редакторе
+    &::-webkit-scrollbar
+      width: 8px
+
+    &::-webkit-scrollbar-track
+      background: #f1f1f1
+      border-radius: 4px
+
+    &::-webkit-scrollbar-thumb
+      background: #c1c1c1
+      border-radius: 4px
+
+    &::-webkit-scrollbar-thumb:hover
+      background: #a8a8a8
+
+  &__actions
+    display: flex
+    gap: 10px
+    padding: 15px 0
+    border-top: 1px solid #dee2e6
+    margin-top: 15px
+
+    button
+      min-width: 100px
+      padding: 0.5rem 1rem
+      font-weight: 500
+
+  &__status
+    position: absolute
+    right: 15px
+    top: 50%
+    transform: translateY(-50%)
+    font-size: 0.875em
+    color: #6c757d
+    background: rgba(255, 255, 255, 0.9)
+    padding: 2px 8px
+    border-radius: 4px
+
+  // Адаптивность
+  @media (max-width: 768px)
+    &__toolbar
+      padding: 8px
+      gap: 6px
+
+      button
+        min-width: 32px
+        height: 32px
+        font-size: 12px
+
+    &__title
+      input
+        font-size: 1.25rem
+        padding: 0.5rem
+
+    &__content
+      min-height: 300px
+      font-size: 15px
+
+    &__actions
+      flex-wrap: wrap
+
+      button
+        flex: 1
+        min-width: auto-----------------------------------------
+----- file: components\PoemItem\PoemItem.tsx -----
+import React, {useContext} from 'react';
+import { useLocation } from 'react-router-dom';
+import { Card } from 'react-bootstrap';
+import {observer} from 'mobx-react-lite';
+
+import { MAIN_ROUTE } from '../../utils/consts';
+import { IAuthor, IPoem} from '../../types/types';
+import { Context } from '../../index';
+
+import './poemItem.sass';
+
+interface PoemItemProps {
+    poem: IPoem;
+    onClick: (poem: IPoem) => void;
+};
+
+
+const PoemItem: React.FC<PoemItemProps> = observer(({poem, onClick}) => {  
+    const {library} = useContext(Context);
+    const location = useLocation();
+    const isMain = location.pathname === MAIN_ROUTE;
+    const authorPoem: IAuthor[] = library.authors.filter(author => author.id === poem.authorId);  
+
+    if (Boolean(authorPoem.length)) {
+        return (
+            <Card 
+                className="poem-card shadow"
+                onClick={() => onClick(poem)}
+            >
+                {isMain ?
+                    <div>
+                        <div className="poem-card__title">{poem.title}</div>
+                        <div className='poem-card__author'>{authorPoem[0].name}</div>
+                    </div>
+                    :
+                    <div className="poem-card__title">{poem.title}</div>
+                }
+            </Card>
+        );
+    } else {
+        return (
+            <></>
+        );
+    }
+});
+
+export default PoemItem;-----------------------------------------
+----- file: components\PoemItem\poemItem.sass -----
+.poem-card
+    display: flex
+    flex-direction: row
+    justify-content: space-between
+    margin-top: 15px
+    padding: 10px
+    font-size: 18px
+    line-height: 35px
+    cursor: pointer
+    &__title
+        font-weight: bold
+    &__author
+        color: darkgrey
+
+@media (max-width: 991px)
+    .poem-card
+        font-size: 16px
+-----------------------------------------
+----- file: components\PoemsList\PoemsList.tsx -----
+import React, {useState} from 'react';
+import { Container, ListGroup } from 'react-bootstrap';
+import { observer } from 'mobx-react-lite';
+
+import { IPoem, IAuthor } from '../../types/types';
+import ModalPoemDetail from '../Modals/ModalPoemDetail';
+import List from '../List/List';
+import PoemItem from '../PoemItem/PoemItem';
+
+import './poemsList.sass';
+
+interface PoemsListProps {
+    authorPoems: IPoem[];
+    author: IAuthor
+};
+
+
+const PoemsList: React.FC<PoemsListProps> = observer(({authorPoems, author}) => {
+    const [poem, setPoem] = useState<IPoem>({} as IPoem);
+    const [visible, setVisible] = useState<boolean>(false);
+
+    const selectPoem = (item: IPoem) => {
+        setPoem(item);
+        setVisible(true)
+    };
+
+    console.log('PoemsList рендерится, стихов:', authorPoems.length);
+
+    return (
+        <Container>
+            <div className="poems-list__title">
+                <h3 style={{textAlign: 'center'}}>Стихи автора:</h3>
+            </div>
+                <ListGroup className="poems-list__list">
+                    <List 
+                        items={authorPoems} 
+                        renderItem={(poem: IPoem) => 
+                            <PoemItem
+                                poem={poem} 
+                                onClick={(poem) => selectPoem(poem)}                  
+                                key={poem.id} 
+                            />
+                        } 
+                    />
+                </ListGroup>
+            {/* } */}
+            <ModalPoemDetail 
+                showPoem={visible} 
+                onHidePoem={() => setVisible(false)} 
+                poem={poem}
+                author={author}
+            />
+        </Container>        
+    );
+});
+
+export default PoemsList;-----------------------------------------
+----- file: components\PoemsList\poemsList.sass -----
+.poems-list
+    &__title
+        display: flex
+        justify-content: center
+        margin-top: 30px
+    &__list
+        align-items: center-----------------------------------------
+----- file: components\SearchPanel\SearchPanel.tsx -----
+import React, {useState, useEffect, useContext} from 'react';
+
+import { IAuthor } from '../../types/types';
+import { Context } from '../../index';
+
+import './searchPanel.sass';
+
+interface SearchPanelProps {
+    authors: IAuthor[];
+};
+
+
+const SearchPanel: React.FC<SearchPanelProps> = ({authors}) => { 
+    const {library} = useContext(Context);
+    const [value, setValue] = useState<string>('');
+
+    useEffect(() => {
+        library.setVisibleAuthors((search(authors, value)));
+    }, [value, authors]);
+
+    useEffect(() => {
+        search(authors, value);
+    }, [value, authors]);
+
+
+    function search(items: (IAuthor)[], term: string) {   
+        if (term.length === 0) {
+            return items;
+        }
+
+        return items.filter(item => {
+            return (             
+                item.name.toLowerCase().indexOf(term.toLowerCase()) > -1
+            )
+        }); 
+    };
+
+
+    return (
+        <>  
+            <div className='search'>
+                <input 
+                    className='search__input' 
+                    type='text' 
+                    placeholder='Начни вводить автора...' 
+                    value={value}
+                    onChange={e => setValue(e.target.value)}
+                />            
+                {Boolean(value) && <i className="bi bi-x-circle search__icon" onClick={() => setValue('')}></i>}
+            </div>
+        </>
+    );
+};
+
+export default SearchPanel;-----------------------------------------
+----- file: components\SearchPanel\SearchPanelPoems.tsx -----
+import React, {useState, useEffect, useContext} from 'react';
+import {observer} from 'mobx-react-lite';
+
+import { IAuthor, IPoem } from '../../types/types';
+import { fetchAuthors } from '../../http/authorsAPI';
+import { Context } from '../../index';
+
+import './searchPanel.sass';
+
+interface SearchPanelPoemsProps {
+    poems: IPoem[];
+};
+
+
+const SearchPanelPoems: React.FC<SearchPanelPoemsProps> = observer(({poems}) => { 
+    const {library} = useContext(Context);
+    const [authors, setAuthors] = useState<IAuthor[]>([]);
+    const [value, setValue] = useState<string>('');
+
+    useEffect(() => {
+        fetchAuthors()
+            .then(data => setAuthors(data))
+            .catch(err => alert(err.message));
+    }, []);
+
+    useEffect(() => {
+        library.setVisiblePoems(search(poems, value));
+    }, [value, poems]);
+
+    function search(items: (IPoem)[], term: string) {   
+        if (term.length === 0) {
+            return items;
+        }
+
+        return items.filter(item => {
+            return (             
+                item.title.toLowerCase().indexOf(term.toLowerCase()) > -1
+            )
+        }); 
+    };
+
+
+    return (
+        <>  
+            <div className='search'>
+                <input 
+                    className='search__input' 
+                    type='text' 
+                    placeholder='Начни вводить название стихотворения...' 
+                    value={value}
+                    onChange={e => setValue(e.target.value)}
+                />            
+                {Boolean(value) && <i className="bi bi-x-circle search__icon" onClick={() => setValue('')}></i>}
+            </div>
+        </>
+    );
+});
+
+export default SearchPanelPoems;-----------------------------------------
+----- file: components\SearchPanel\searchPanel.sass -----
+.sort
+    margin: 15px auto 20px
+    width: 70%
+    &__title
+        padding-left: 5px
+        margin-bottom: 10px
+    &__btns
+        display: flex
+        justify-content: start
+    &__btn
+        width: 150px
+        height: 40px
+        bpoem: none
+        bpoem-radius: 15px
+        margin-right: 20px
+        background-color: #e8eded
+        &:hover
+            background-color: #222222
+            color: white
+.search
+    width: 70%
+    margin: 70px auto 20px
+    position: relative
+    &__input
+        width: 100%
+        height: 33px
+        bpoem: none
+        bpoem-bottom: 1px solid darkgrey
+        padding: 10px
+        &:focus
+            bpoem: 1px solid #bfd2d2
+            bpoem-radius: 15px
+            outline: none
+    &__icon
+        position: absolute
+        top: 2px
+        right: 10px
+        font-size: 20px
+        color: silver
+        cursor: pointer
+
+@media ( max-width: 1119px )
+    .sort__btn
+        width: 120px
+
+@media ( max-width: 768px )
+    .sort
+        width: 100%
+        &__btns
+            margin: 80px auto 20px
+            display: grid
+            grid-template-columns: repeat(auto-fit, 120px)
+            gap: 20px
+            justify-content: center
+    .search
+        width: 100%
+-----------------------------------------
+----- file: http\authorsAPI.ts -----
+import { $authHost } from ".";
+
+export const createAuthor = async (name: string) => {
+    const {data} = await $authHost.post('api/authors', {name});
+    return data;
+};
+
+export const fetchAuthors = async () => {
+    const {data} = await $authHost.get('api/authors');
+    return data;
+};
+
+export const fetchOneAuthor = async (id: number) => {
+    const {data} = await $authHost.get('api/authors/' + id);
+    return data;
+};
+
+export const updateAuthor = async (id: number, name: string) => {
+    const {data} = await $authHost.put('api/authors/' + id, {name});
+    return data;
+};
+
+export const deleteAuthor = async (id: number) => {
+    const {data} = await $authHost.delete('api/authors/' + id);
+    return data;
+};-----------------------------------------
+----- file: http\index.ts -----
+import axios from 'axios';
+
+const $host = axios.create({
+    baseURL: process.env.REACT_APP_API_URL
+});
+
+const $authHost = axios.create({
+    baseURL: process.env.REACT_APP_API_URL
+});
+
+// @ts-ignore
+const authInterception = config => {
+    config.headers.authorization = `Bearer ${localStorage.getItem('token')}`;
+    return config;
+};
+
+$authHost.interceptors.request.use(authInterception);
+
+export {
+    $host,
+    $authHost
+};
+
+// REACT_APP_API_URL='http://localhost:5000/'
+// REACT_APP_API_URL='https://authors.kornlex.ru/'-----------------------------------------
+----- file: http\notesAPI.ts -----
+import { $authHost } from ".";
+
+export const createNote = async (note: { title: string; content: string; }) => {
+    const {data} = await $authHost.post('api/notes', note);
+    return data;
+};
+
+
+export const fetchNotes = async () => {
+    const {data} = await $authHost.get('api/notes');
+    return data;
+};
+
+export const fetchOneNote = async (id: string) => {
+    const {data} = await $authHost.get('api/notes/' + id);
+    return data;
+};
+
+export const updateNote = async (id: number, note: { title: string; content: string; }) => {
+    const {data} = await $authHost.put('api/notes/' + id, note);
+    return data;
+};
+
+export const deleteNote = async (id: number) => {
+    const {data} = await $authHost.delete('api/notes/' + id);
+    return data;
+};-----------------------------------------
+----- file: http\poemsAPI.ts -----
+import { $authHost } from ".";
+
+export const createPoem = async (poem: { title: string; content: string; html_content: string, authorId: number }) => {
+    const {data} = await $authHost.post('api/poems', poem);
+    return data;
+};
+
+
+export const fetchPoems = async () => {
+    const {data} = await $authHost.get('api/poems');
+    return data;
+};
+
+export const fetchOnePoem = async (id: string | undefined) => {
+    const {data} = await $authHost.get('api/poems/' + id);
+    return data;
+};
+
+export const updatePoem = async (id: number, poem: { title?: string; content?: string; html_content?: string, authorId: number }) => {
+    const {data} = await $authHost.put('api/poems/' + id, poem);
+    return data;
+};
+
+export const deletePoem = async (id: number) => {
+    const {data} = await $authHost.delete('api/poems/' + id);
+    return data;
+};-----------------------------------------
+----- file: http\userAPI.ts -----
+import { $authHost, $host } from "./index";
+import jwt_decode from 'jwt-decode';
+
+export const registration = async (email: string, password: string) => {
+    const {data} = await $host.post('api/users/register', {email, password}); 
+    localStorage.setItem('token', data.token);
+    return jwt_decode(data.token);
+};
+
+export const login = async (email: string, password: string) => {
+    const {data} = await $host.post('api/users/login', {email, password});
+    localStorage.setItem('token', data.token);    
+    return jwt_decode(data.token);
+};
+
+export const check = async () => {
+    const {data} = await $authHost.get('api/users/auth');
+    localStorage.setItem('token', data.token);
+    return jwt_decode(data.token);
+};-----------------------------------------
+----- file: index.tsx -----
+import React, {createContext} from 'react';
+import ReactDOM from 'react-dom/client';
+
+import App from './App';
+import UserStore from './store/UserStore';
+import LibraryStore from './store/LibraryStore';
+
+import './style/style.sass';
+
+type RootStateContextValue = {
+  users: UserStore;
+  library: LibraryStore;
+};
+
+export const Context = createContext<RootStateContextValue>({} as RootStateContextValue);
+
+const root = ReactDOM.createRoot(
+  document.getElementById('root') as HTMLElement
+);
+root.render(
+  <Context.Provider value={{
+    users: new UserStore(),
+    library: new LibraryStore()
+  }}>
+    <App />
+  </Context.Provider>
+);-----------------------------------------
+----- file: pages\AuthPage.tsx -----
+import React, {useState, useContext} from 'react';
+import {Container, Form, Card, Button} from 'react-bootstrap';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import {AxiosError} from 'axios';
+import {Helmet} from "react-helmet";
+
+import { LOGIN_ROUTE, REGISTER_ROUTE, MAIN_ROUTE } from '../utils/consts';
+import { login, registration } from '../http/userAPI';
+import {Context} from '../index';
+
+
+const AuthPage: React.FC = () => {
+    const {users} = useContext(Context);
+    const location = useLocation();
+    const navigate = useNavigate();
+    const isLogin = location.pathname === LOGIN_ROUTE;
+    const [email, setUsername] = useState('');
+    const [password, setPassword] = useState('');
+
+    const click = async () => {
+        try {
+            if (isLogin) {
+                await login(email, password).then(() => {
+                    users.setIsAuth(true);
+                    navigate(MAIN_ROUTE);
+                });
+            } else {
+                await registration(email, password).then(() => {
+                    users.setIsAuth(true);
+                    navigate(MAIN_ROUTE);
+                });
+            }  
+        } catch(err: unknown) {
+            const error = err as AxiosError;
+            alert(JSON.parse(error.request.response).message);
+        }        
+    };
+
+    return (
+        <Container 
+            className='d-flex justify-content-center align-items-center'
+            style ={{height: window.innerHeight - 54}}
+        >
+            <Helmet>
+                <title>Авторизация</title>
+                <meta name="description" content="Авторизация" />
+            </Helmet>
+            <Card style={{width: 600}} className="p-5">
+                <h2 className='m-author'>{isLogin ? 'Авторизация' : 'Регистрация'}</h2>
+                <Form className="d-flex flex-column">
+                    <Form.Control
+                        className="mt-3"
+                        placeholder="Введите ваш email..."
+                        value={email}
+                        onChange={e => setUsername(e.target.value)}
+                    />
+                    <Form.Control
+                        className="mt-3"
+                        placeholder="Введите ваш пароль..."
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                        type='password'
+                    />
+                    <div className="d-flex justify-content-between mt-3">
+                        {isLogin ?
+                            <div>
+                                Нет аккаунта? <NavLink to={REGISTER_ROUTE}>Зарегистрируйтесь!</NavLink>
+                            </div>
+                            :
+                            <div>
+                                Есть аккаунт? <NavLink to={LOGIN_ROUTE}>Войдите!</NavLink>
+                            </div>
+                        }                        
+                        <Button 
+                            onClick={click}
+                            variant={"outline-success"}
+                            >
+                            {isLogin ? 'Войти' : 'Регистрация'}
+                        </Button>
+                    </div>                  
+                </Form>
+            </Card>
+        </Container>
+    );
+};
+
+export default AuthPage;-----------------------------------------
+----- file: pages\AuthorPage.tsx -----
+import React, {useState, useEffect, useContext} from 'react';
+import { useParams } from 'react-router-dom';
+import {Spinner} from 'react-bootstrap';
+import {observer} from 'mobx-react-lite';
+
+import AuthorBlock from '../components/AuthorBlock/AuthorBlock';
+import PoemsList from '../components/PoemsList/PoemsList';
+import Pageup from '../components/Pageup/Pageup';
+import { IAuthor, IPoem } from '../types/types';
+import { fetchPoems } from '../http/poemsAPI';
+import { fetchAuthors } from '../http/authorsAPI';
+import { Context } from '../index';
+
+const AuthorPage: React.FC = observer(() => {
+    const {library} = useContext(Context);
+    const [loading, setLoading] = useState<boolean>(true);
+    const [authorPoems, setAuthorPoems] = useState<IPoem[]>([]);
+    const [author, setAuthor] = useState<IAuthor>({} as IAuthor);
+    const {id} = useParams<{id: string}>();
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const loadData = async () => {
+            setLoading(true);
+            try {
+                const [authorsData, poemsData] = await Promise.all([
+                    fetchAuthors(),
+                    fetchPoems(),
+                ]);
+        
+                const numericId = Number(id);
+                library.setAuthors(authorsData);
+        
+                const currentAuthor = authorsData.find(
+                    (a: IAuthor) => a.id === numericId
+                );
+                setAuthor(currentAuthor || ({} as IAuthor));
+        
+                library.setPoems(poemsData);
+        
+                const filtered = poemsData.filter(
+                    (poem: IPoem) => Number(poem.authorId) === numericId
+                );
+                setAuthorPoems(filtered);
+            } catch (error) {
+                console.error('Ошибка загрузки:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadData();
+
+        return () => { cancelled = true; };
+    }, [id, library.toggle]);
+
+    return (
+        <div>
+            <AuthorBlock />
+            {loading ? 
+                <Spinner animation="border" /> : 
+                <PoemsList authorPoems={authorPoems} author={author} />
+            }
+            <Pageup />
+        </div>
+    );
+});
+
+export default AuthorPage;-----------------------------------------
+----- file: pages\AuthorsPage.tsx -----
+import React, {useState, useEffect, useContext} from 'react';
+import {useNavigate} from 'react-router-dom';
+import { Container, Spinner, Button } from 'react-bootstrap';
+import {observer} from 'mobx-react-lite';
+import {Helmet} from "react-helmet";
+
+import List from '../components/List/List';
+import AuthorItem from '../components/AuthorItem/AuthorItem';
+import SearchPanel from '../components/SearchPanel/SearchPanel';
+import Pageup from '../components/Pageup/Pageup';
+import ModalAuthorAdd from '../components/Modals/ModalAuthorAdd';
+import { IAuthor } from '../types/types';
+import { Context } from '../index';
+import { fetchAuthors } from '../http/authorsAPI';
+import { fetchPoems } from '../http/poemsAPI';
+
+
+
+const AuthorsPage: React.FC = observer(() => {
+    const {library} = useContext(Context);
+    const [loading, setLoading] = useState<boolean>(true);
+    const [visible, setVisible] = useState<boolean>(false);
+    const [authors, setAuthors] = useState<IAuthor[]>([]);
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        fetchAuthors()
+            .then(data => {
+                library.setAuthors(data);
+                setAuthors(data);
+            })
+            .catch(err => alert(err.message))
+            .finally(() => setLoading(false));
+
+        fetchPoems()
+            .then(data => library.setPoems(data))
+            .catch(err => alert(err.message))
+    }, []);
+    
+    return (
+        <Container
+            style={{display: 'flex', flexDirection: 'column', alignItems: 'center'}}
+        >
+            <Helmet>
+                <title>Список авторов</title>
+                <meta name="description" content="Список авторов" />
+            </Helmet>
+
+            <SearchPanel authors={authors} />
+            <Button variant={"outline-success"} onClick={() => library.setVisibleModal(true)} >Добавить автора</Button>
+            {loading ? <Spinner animation={"border"}/> :
+                <List
+                    items={library.visibleAuthors}
+                    renderItem={(author: IAuthor) => 
+                        <AuthorItem 
+                            onClick={(author) => navigate('/author/' + author.id)} 
+                            author={author}
+                            key={author.id} 
+                        />
+                    } 
+                />
+            }
+            <Pageup />
+            <ModalAuthorAdd
+                show={library.visibleModal} 
+                onHide={() => setVisible(false)}
+            />
+        </Container>
+    );
+});
+
+export default AuthorsPage;-----------------------------------------
+----- file: pages\MainPage.tsx -----
+import React, {useState, useEffect, useContext} from 'react';
+import { Container, Spinner } from 'react-bootstrap';
+import {observer} from 'mobx-react-lite';
+import {Helmet} from "react-helmet";
+
+import List from '../components/List/List';
+import PoemItem from '../components/PoemItem/PoemItem';
+import SearchPanelPoems from '../components/SearchPanel/SearchPanelPoems';
+import Pageup from '../components/Pageup/Pageup';
+import ModalPoemDetail from '../components/Modals/ModalPoemDetail';
+import poemStore from '../store/PoemsStore';
+import { IAuthor, IPoem } from '../types/types';
+import { Context } from '../index';
+import { fetchAuthors } from '../http/authorsAPI';
+import { fetchPoems } from '../http/poemsAPI';
+
+
+const MainPage: React.FC = observer(() => {
+    const {library} = useContext(Context);
+    const [loading, setLoading] = useState<boolean>(true);
+    const [visible, setVisible] = useState<boolean>(false);
+    const [poem, setPoem] = useState<IPoem>({} as IPoem);
+    const [author, setAuthor] = useState<IAuthor>({} as IAuthor);
+    const [poems, setPoems] = useState<IPoem[]>([]);
+
+    useEffect(() => {
+        getPoems();
+    }, [library.toggle]);
+
+    useEffect(() => {
+        fetchAuthors().then(data => library.setAuthors(data));
+    }, []);
+  
+    function getPoems() {
+        fetchPoems()
+            .then(data => {
+                library.setPoems(data);
+                setPoems(data);
+            })
+            .catch(err => alert(err.message))
+            .finally(() => setLoading(false));
+    }
+
+    const selectPoem = (item: IPoem) => {
+        setPoem(item);
+        poemStore.currentPoem = item;
+        setVisible(true)
+    };
+
+    const handleSave = () => {
+        // Обновляем список после сохранения
+        fetchPoems()
+            .then(data => {
+                setPoems(data);
+                setVisible(false);
+            })
+            .catch(err => {
+                console.error('Ошибка при обновлении списка:', err);
+            });
+    };
+
+    if (loading) {
+        return <Spinner />
+    }
+
+    return (        
+        <Container
+            style={{display: 'flex', flexDirection: 'column', alignItems: 'center'}}
+        >
+            <Helmet>
+                <title>Список стихотворений</title>
+                <meta name="description" content="Список стихотворений" />
+            </Helmet>
+
+            <SearchPanelPoems poems={poems} />
+            {loading ? <Spinner animation={"border"}/> :
+                <List 
+                    items={library.visiblePoems} 
+                    renderItem={(poem: IPoem) => 
+                        <PoemItem 
+                            poem={poem} 
+                            onClick={(poem) => selectPoem(poem)}                  
+                            key={poem.id} 
+                        />
+                    } 
+                />
+            }
+            <Pageup />
+            <ModalPoemDetail 
+                showPoem={visible} 
+                onHidePoem={() => setVisible(false)} 
+                poem={poem}
+                author={author}
+                onSave={handleSave}
+            />
+        </Container>
+    );
+});
+
+export default MainPage;-----------------------------------------
+----- file: pages\Page404.tsx -----
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { Helmet } from "react-helmet";
+
+
+const Page404: React.FC = () => {
+    return (
+        <div>
+            <Helmet>
+                <meta
+                    name="description"
+                    content='Page not found'
+                />        
+                <title>404 page</title>
+            </Helmet>
+            <div style={{'textAlign': 'center', 'fontWeight': 'bold', 'fontSize': '24px', 'marginTop': '30px'}}>Такой страницы нет</div>
+            <Link style={{'display': 'block', 'textAlign': 'center', 'fontWeight': 'bold', 'fontSize': '24px', 'color': '#9F0013', 'marginTop': '30px'}} to="/">Вернуться на Главную</Link>
+        </div>
+    )
+}
+
+export default Page404;-----------------------------------------
+----- file: pages\index.ts -----
+import AuthPage from './AuthPage';
+import AuthorPage from './AuthorPage';
+import AuthorsPage from './AuthorsPage';
+import MainPage from './MainPage';
+import Page404 from './Page404';
+
+export { AuthorPage, AuthorsPage, AuthPage, MainPage, Page404 };-----------------------------------------
+----- file: react-app-env.d.ts -----
+/// <reference types="react-scripts" />
+-----------------------------------------
+----- file: routes.ts -----
+import { LOGIN_ROUTE, REGISTER_ROUTE, AUTHOR_ROUTE, AUTHORS_ROUTE, MAIN_ROUTE, NOTFOUND_ROUTE } from "./utils/consts";
+import { AuthorPage, AuthorsPage, AuthPage, MainPage, Page404 } from './pages';
+
+export const authRoutes = [
+    {
+        path: MAIN_ROUTE,
+        Component: MainPage
+    },
+    {
+        path: AUTHORS_ROUTE,
+        Component: AuthorsPage
+    },
+    {
+        path: AUTHOR_ROUTE + '/:id',
+        Component: AuthorPage
+    },
+    {
+        path: NOTFOUND_ROUTE,
+        Component: Page404
+    },
+];
+
+export const publicRoutes = [
+    {
+        path: LOGIN_ROUTE,
+        Component: AuthPage
+    },
+    {
+        path: REGISTER_ROUTE,
+        Component: AuthPage
+    }
+];-----------------------------------------
+----- file: store\LibraryStore.ts -----
+import {makeAutoObservable} from 'mobx';
+
+import { IPoem, IAuthor } from '../types/types';
+
+export default class LibraryStore {
+    _authors: IAuthor[];
+    _poems: IPoem[];
+    _selectedAuthor: IAuthor;
+    _visibleAuthors: IAuthor[];
+    _visiblePoems: IPoem[];
+    _visibleModal: boolean;
+    _toggle: boolean;
+
+    constructor() {
+       this._authors = [];
+       this._poems = [];
+       this._selectedAuthor = {
+            id: 0,
+            name: '',
+            userId: 0,      
+        };
+       this._visibleAuthors = [];
+       this._visiblePoems = [];
+       this._visibleModal = false;
+       this._toggle = false;
+
+       makeAutoObservable(this); 
+    };
+
+    setAuthors(authors: IAuthor[]) {
+        this._authors = authors;
+    };
+    setPoems(poems: IPoem[]) {
+        this._poems = poems;
+    };
+    setSelectedAuthor(author: IAuthor) {
+        this._selectedAuthor = author;
+    };
+    setVisibleAuthors(visibleAuthors: IAuthor[]) {
+        this._visibleAuthors = visibleAuthors;
+    };
+    setVisiblePoems(visiblePoems: IPoem[]) {
+        this._visiblePoems = visiblePoems;
+    };
+    setVisibleModal(bool: boolean) {
+        this._visibleModal = bool;
+    };
+    setToggle(bool: boolean) {
+        this._toggle = bool;
+    };
+
+    get authors() {
+        return this._authors;
+    };
+    get poems() {
+        return this._poems;
+    };
+    get selectedAuthor() {
+        return this._selectedAuthor;
+    }
+    get visibleAuthors() {
+        return this._visibleAuthors;
+    };
+    get visiblePoems() {
+        return this._visiblePoems;
+    };
+    get toggle() {
+        return this._toggle;
+    };
+    get visibleModal() {
+        return this._visibleModal;
+    };
+};-----------------------------------------
+----- file: store\PoemsStore.ts -----
+import { makeAutoObservable, runInAction } from 'mobx';
+import { IPoem } from '../types/types';
+import { 
+  createPoem as apiCreatePoem, 
+  updatePoem as apiUpdatePoem
+} from '../http/poemsAPI';
+
+class PoemStore {
+  poems: IPoem[] = [];
+  currentPoem: IPoem | null = null;
+  isLoading = false;
+  error: string | null = null;
+
+  constructor() {
+    makeAutoObservable(this);
+  }
+
+  async createPoem(data: { title: string; content: string; html_content: string, authorId: number }) {
+    this.isLoading = true;
+    this.error = null;
+    try {
+      const poem = await apiCreatePoem(data);
+      runInAction(() => {
+        this.poems.unshift(poem);
+        this.currentPoem = poem;
+        this.isLoading = false;
+      });
+
+      return poem;
+    } catch (error: any) {
+      runInAction(() => {
+        this.error = error.response?.data?.error || 'Ошибка при создании заметки';
+        this.isLoading = false;
+      });
+      console.error('Error creating poem:', error);
+      throw error;
+    }
+  }
+
+  async updatePoem(id: number, data: { title?: string; content?: string; html_content?: string, authorId: number }) {
+    this.isLoading = true;
+    this.error = null;
+    try {
+      const updatedPoem = await apiUpdatePoem(id, data);
+      runInAction(() => {
+        const index = this.poems.findIndex(poem => poem.id === id);
+        if (index !== -1) {
+          this.poems[index] = updatedPoem;
+        }
+        this.currentPoem = updatedPoem;
+        this.isLoading = false;
+      });
+
+      return updatedPoem;
+    } catch (error: any) {
+      runInAction(() => {
+        this.error = error.response?.data?.error || 'Ошибка при обновлении заметки';
+        this.isLoading = false;
+      });
+      console.error(`Error updating poem ${id}:`, error);
+      throw error;
+    }
+  }
+
+  clearCurrentPoem() {
+    this.currentPoem = null;
+  }
+
+  clearError() {
+    this.error = null;
+  }
+}
+
+export default new PoemStore();-----------------------------------------
+----- file: store\UserStore.ts -----
+import {makeAutoObservable} from 'mobx';
+
+export default class UserStore {
+    _isAuth: boolean;
+
+    constructor() {
+       this._isAuth = false;
+       makeAutoObservable(this); 
+    };
+
+    setIsAuth(bool: boolean) {
+        this._isAuth = bool;
+    };
+
+    get isAuth() {
+        return this._isAuth;
+    };
+};-----------------------------------------
+----- file: style\custom.sass -----
+.nav-link
+    font-size: 20px
+    font-weight: 400
+
+.modal-content
+    background-color: #222222
+    border-color: #444444
+.card
+    background-color: #333333
+    border-color: #555555-----------------------------------------
+----- file: style\style.sass -----
+@import url('https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css')
+@import 'bootstrap-icons/font/bootstrap-icons.css'
+@import './custom.sass'
+
+*
+    box-sizing: border-box
+    margin: 0 
+    padding: 0 
+
+#root
+    padding-bottom: 30px
+
+body
+    overflow-y: scroll
+    background-color: #222222
+    color: whitesmoke
+
+@keyframes btnbeat
+    0%
+        transform: scale(1)
+    50%
+        transform: scale(0.8)
+        border-color: cyan
+    100%
+        transform: scale(1)-----------------------------------------
+----- file: types\types.ts -----
+export interface IAuthor {
+    id: number;
+    name: string;
+    userId: number;
+};
+
+export interface IPoem {
+    id: number;
+    title: string;
+    content: string;
+    html_content: string;
+    userId: number;
+    authorId: number;
+};-----------------------------------------
+----- file: utils\consts.ts -----
+export const LOGIN_ROUTE: string  = '/login';
+export const REGISTER_ROUTE: string  = '/register';
+export const MAIN_ROUTE: string  = '/';
+export const POEM_ROUTE: string  = '/poem';
+export const ADD_POEM_ROUTE: string  = '/poem';
+export const AUTHOR_ROUTE: string  = '/author';
+export const ADD_AUTHOR_ROUTE: string  = '/author';
+export const AUTHORS_ROUTE: string  = '/authors';
+export const NOTFOUND_ROUTE: string  = '/404';-----------------------------------------
