@@ -103,6 +103,7 @@ const AuthorBlock: React.FunctionComponent = () => {
                 show={visibleAddPoem}
                 onHide={() => setVisibleAddPoem(false)}
                 authorId={author.id}
+                author={author}
                 onPoemAdded={handlePoemAdded}
             />
         </div>
