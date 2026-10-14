@@ -44,11 +44,12 @@ const MainPage: React.FC = observer(() => {
     const selectPoem = (item: IPoem) => {
         setPoem(item);
         poemStore.currentPoem = item;
+        const poemAuthor = library.authors.find(a => a.id === item.authorId);
+        setAuthor(poemAuthor || ({} as IAuthor));
         setVisible(true)
     };
 
     const handleSave = () => {
-        // Обновляем список после сохранения
         fetchPoems()
             .then(data => {
                 setPoems(data);
@@ -92,6 +93,7 @@ const MainPage: React.FC = observer(() => {
                 poem={poem}
                 author={author}
                 onSave={handleSave}
+                authorClickable={true}
             />
         </Container>
     );

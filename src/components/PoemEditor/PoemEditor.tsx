@@ -1,18 +1,28 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { observer } from 'mobx-react-lite';
+
 import { IAuthor, IPoem } from '../../types/types';
 import { deletePoem } from '../../http/poemsAPI';
+import { AUTHOR_ROUTE } from '../../utils/consts'; 
 import poemStore from '../../store/PoemsStore';
 
 import "./poemEditor.sass";
 
 interface PoemEditorProps {
   poem: IPoem;
-  author: IAuthor
+  author: IAuthor;
+  authorClickable?: boolean;
   onSave?: () => void;
 }
 
-const PoemEditor: React.FC<PoemEditorProps> = observer(({poem, author, onSave}) => {
+const PoemEditor: React.FC<PoemEditorProps> = observer(({
+  poem, 
+  author, 
+  authorClickable = false,
+  onSave
+}) => {
+  const navigate = useNavigate();
   const [title, setTitle] = useState(poem?.title || '');
   const [authorId, setAuthorId] = useState(poem?.authorId || 0);
   const [content, setContent] = useState(poem?.content || '');
@@ -116,9 +126,14 @@ const PoemEditor: React.FC<PoemEditorProps> = observer(({poem, author, onSave}) 
     }
   };
 
-  // Проверяем, есть ли у нас стих для редактирования
-  const currentPoem = poemStore.currentPoem || poem;
+  const handleAuthorClick = () => {
+    if (!authorClickable) return; // если не кликабельный — ничего не делаем
+    if (!author?.id) return; // если автор не загружен — ничего не делаем
+    
+    navigate(AUTHOR_ROUTE + `/${author.id}`);
+  };
 
+  
   return (
     <div className="poem-editor">
         <div className="poem-editor__toolbar mb-2">
@@ -188,8 +203,19 @@ const PoemEditor: React.FC<PoemEditorProps> = observer(({poem, author, onSave}) 
           </button>
         </div>
 
-        <div>{author.name}</div>
-        <div>author.name</div>
+        <div 
+          className="poem-editor__author"
+          onClick={handleAuthorClick}
+          style={{
+            cursor: authorClickable && author?.id ? 'pointer' : 'default',
+            fontSize: '16px',
+            color: authorClickable && author?.id ? '#86b7fe' : 'whitesmoke',
+            marginBottom: '10px',
+            textDecoration: authorClickable && author?.id ? 'underline' : 'none',
+          }}
+        >
+          {author?.name || 'Автор не указан'}
+        </div>
 
       <div className="poem-editor__title mb-3">
         <input

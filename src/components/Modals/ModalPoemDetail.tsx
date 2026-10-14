@@ -12,10 +12,19 @@ interface ModalPoemDetailProps {
     author: IAuthor;
     onEdit?: (poem: IPoem) => void;
     onSave?: () => void;
+    authorClickable?: boolean;
 };
 
 
-const ModalPoemDetail: React.FunctionComponent<ModalPoemDetailProps> = observer(({showPoem, onHidePoem, poem, author, onEdit, onSave}) => {
+const ModalPoemDetail: React.FunctionComponent<ModalPoemDetailProps> = observer(({
+    showPoem, 
+    onHidePoem, 
+    poem, 
+    author, 
+    onEdit, 
+    onSave,
+    authorClickable = false
+}) => {
     return (
         <Modal
             show={showPoem}
@@ -31,6 +40,7 @@ const ModalPoemDetail: React.FunctionComponent<ModalPoemDetailProps> = observer(
                 <PoemEditor 
                     poem={poem}
                     author={author}
+                    authorClickable={authorClickable}
                     onSave={() => {
                         if (onSave) onSave();
                         onHidePoem();
