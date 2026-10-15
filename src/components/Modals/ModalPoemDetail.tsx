@@ -10,7 +10,6 @@ interface ModalPoemDetailProps {
     onHidePoem: () => void;
     poem: IPoem;
     author: IAuthor;
-    onEdit?: (poem: IPoem) => void;
     onSave?: () => void;
     authorClickable?: boolean;
 };
@@ -21,7 +20,6 @@ const ModalPoemDetail: React.FunctionComponent<ModalPoemDetailProps> = observer(
     onHidePoem, 
     poem, 
     author, 
-    onEdit, 
     onSave,
     authorClickable = false
 }) => {

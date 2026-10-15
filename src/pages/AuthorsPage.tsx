@@ -19,7 +19,6 @@ import { fetchPoems } from '../http/poemsAPI';
 const AuthorsPage: React.FC = observer(() => {
     const {library} = useContext(Context);
     const [loading, setLoading] = useState<boolean>(true);
-    const [visible, setVisible] = useState<boolean>(false);
     const [authors, setAuthors] = useState<IAuthor[]>([]);
     const navigate = useNavigate();
 
@@ -35,7 +34,7 @@ const AuthorsPage: React.FC = observer(() => {
         fetchPoems()
             .then(data => library.setPoems(data))
             .catch(err => alert(err.message))
-    }, []);
+    }, [library.toggle]);
     
     return (
         <Container
@@ -63,7 +62,7 @@ const AuthorsPage: React.FC = observer(() => {
             <Pageup />
             <ModalAuthorAdd
                 show={library.visibleModal} 
-                onHide={() => setVisible(false)}
+                onHide={() => library.setVisibleModal(false)}
             />
         </Container>
     );

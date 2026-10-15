@@ -174,6 +174,7 @@ const AuthorBlock: React.FunctionComponent = () => {
                 show={visibleAddPoem}
                 onHide={() => setVisibleAddPoem(false)}
                 authorId={author.id}
+                author={author}
                 onPoemAdded={handlePoemAdded}
             />
         </div>
@@ -808,92 +809,52 @@ const ModalAuthorUpdate: React.FC<ModalAuthorUpdateProps> = ({show, onHide, auth
 
 export default ModalAuthorUpdate;-----------------------------------------
 ----- file: components\Modals\ModalPoemAdd.tsx -----
-// src/components/Modals/ModalPoemAdd.tsx
-import React, { useState } from 'react';
-import { Modal, Form, Button } from 'react-bootstrap';
+import React from 'react';
+import { Modal } from 'react-bootstrap';
 import { observer } from 'mobx-react-lite';
-import { createPoem } from '../../http/poemsAPI';
+
+import { IAuthor, IPoem } from '../../types/types';
+import PoemEditor from '../PoemEditor/PoemEditor';
+
 
 interface ModalPoemAddProps {
     show: boolean;
     onHide: () => void;
     authorId: number;
+    author: IAuthor;
     onPoemAdded?: () => void;
 }
 
-const ModalPoemAdd: React.FC<ModalPoemAddProps> = observer(({ show, onHide, authorId, onPoemAdded }) => {
-    const [title, setTitle] = useState('');
-    const [content, setContent] = useState('');
-    const [loading, setLoading] = useState(false);
-
-    const handleSubmit = async () => {
-        if (!title.trim() || !content.trim()) {
-            alert('Заполните заголовок и содержание стиха');
-            return;
-        }
-        
-        setLoading(true);
-        try {
-            await createPoem({
-                title: title.trim(),
-                content: content.trim(),
-                html_content: content.trim(),
-                //@ts-ignore
-                authorId: authorId
-            });
-            
-            setTitle('');
-            setContent('');
-            onHide();
-            
-            // Вызываем колбэк для обновления списка
-            if (onPoemAdded) {
-                onPoemAdded();
-            }
-        } catch (error) {
-            console.error('Ошибка создания стиха:', error);
-            alert('Не удалось создать стих');
-        } finally {
-            setLoading(false);
-        }
+const ModalPoemAdd: React.FC<ModalPoemAddProps> = observer(({ show, onHide, authorId, author, onPoemAdded }) => {
+    const emptyPoem: IPoem = {
+        id: 0,
+        title: '',
+        content: '',
+        html_content: '',
+        userId: 0,
+        authorId: authorId,
     };
 
+    const handleSave = () => {
+        onHide();
+        if (onPoemAdded) {
+            onPoemAdded();
+        }
+    }; 
+
+    
     return (
-        <Modal show={show} onHide={onHide} size="lg">
+        <Modal show={show} onHide={onHide} fullscreen="xxl" centered>
             <Modal.Header closeButton>
                 <Modal.Title>Добавить стихотворение</Modal.Title>
             </Modal.Header>
             <Modal.Body>
-                <Form>
-                    <Form.Group className="mb-3">
-                        <Form.Label>Название</Form.Label>
-                        <Form.Control
-                            type="text"
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            placeholder="Введи название"
-                        />
-                    </Form.Group>
-                    <Form.Group className="mb-3">
-                        <Form.Label>Содержание</Form.Label>
-                        <Form.Control
-                            as="textarea"
-                            rows={10}
-                            value={content}
-                            onChange={(e) => setContent(e.target.value)}
-                            placeholder="Введи текст стихотворения"
-                        />
-                    </Form.Group>
-                </Form>
+                <PoemEditor 
+                    poem={emptyPoem}
+                    author={author}
+                    onSave={handleSave}
+                />
             </Modal.Body>
-            <Modal.Footer>
-                <Button variant="secondary" onClick={onHide}>
-                    Отмена
-                </Button>
-                <Button variant="primary" onClick={handleSubmit} disabled={loading}>
-                    {loading ? 'Сохранение...' : 'Сохранить'}
-                </Button>
-            </Modal.Footer>
         </Modal>
     );
 });
@@ -914,10 +875,19 @@ interface ModalPoemDetailProps {
     author: IAuthor;
     onEdit?: (poem: IPoem) => void;
     onSave?: () => void;
+    authorClickable?: boolean;
 };
 
 
-const ModalPoemDetail: React.FunctionComponent<ModalPoemDetailProps> = observer(({showPoem, onHidePoem, poem, author, onEdit, onSave}) => {
+const ModalPoemDetail: React.FunctionComponent<ModalPoemDetailProps> = observer(({
+    showPoem, 
+    onHidePoem, 
+    poem, 
+    author, 
+    onEdit, 
+    onSave,
+    authorClickable = false
+}) => {
     return (
         <Modal
             show={showPoem}
@@ -933,6 +903,7 @@ const ModalPoemDetail: React.FunctionComponent<ModalPoemDetailProps> = observer(
                 <PoemEditor 
                     poem={poem}
                     author={author}
+                    authorClickable={authorClickable}
                     onSave={() => {
                         if (onSave) onSave();
                         onHidePoem();
@@ -1014,20 +985,30 @@ export default Pageup;-----------------------------------------
                 opasity: unset-----------------------------------------
 ----- file: components\PoemEditor\PoemEditor.tsx -----
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { observer } from 'mobx-react-lite';
+
 import { IAuthor, IPoem } from '../../types/types';
 import { deletePoem } from '../../http/poemsAPI';
+import { AUTHOR_ROUTE } from '../../utils/consts'; 
 import poemStore from '../../store/PoemsStore';
 
 import "./poemEditor.sass";
 
 interface PoemEditorProps {
   poem: IPoem;
-  author: IAuthor
+  author: IAuthor;
+  authorClickable?: boolean;
   onSave?: () => void;
 }
 
-const PoemEditor: React.FC<PoemEditorProps> = observer(({poem, author, onSave}) => {
+const PoemEditor: React.FC<PoemEditorProps> = observer(({
+  poem, 
+  author, 
+  authorClickable = false,
+  onSave
+}) => {
+  const navigate = useNavigate();
   const [title, setTitle] = useState(poem?.title || '');
   const [authorId, setAuthorId] = useState(poem?.authorId || 0);
   const [content, setContent] = useState(poem?.content || '');
@@ -1084,6 +1065,14 @@ const PoemEditor: React.FC<PoemEditorProps> = observer(({poem, author, onSave}) 
       alert('Стих не может быть пустым');
       return;
     }
+    if (!title.trim()) {
+      alert('Заголовок не может быть пустым');
+      return;
+    }
+    if (!currentText.trim()) {
+        alert('Содержание не может быть пустым');
+        return;
+    }
     
     try {
       if (isEditing) {
@@ -1131,9 +1120,14 @@ const PoemEditor: React.FC<PoemEditorProps> = observer(({poem, author, onSave}) 
     }
   };
 
-  // Проверяем, есть ли у нас стих для редактирования
-  const currentPoem = poemStore.currentPoem || poem;
+  const handleAuthorClick = () => {
+    if (!authorClickable) return; // если не кликабельный — ничего не делаем
+    if (!author?.id) return; // если автор не загружен — ничего не делаем
+    
+    navigate(AUTHOR_ROUTE + `/${author.id}`);
+  };
 
+  
   return (
     <div className="poem-editor">
         <div className="poem-editor__toolbar mb-2">
@@ -1203,8 +1197,19 @@ const PoemEditor: React.FC<PoemEditorProps> = observer(({poem, author, onSave}) 
           </button>
         </div>
 
-        <div>{author.name}</div>
-        <div>author.name</div>
+        <div 
+          className="poem-editor__author"
+          onClick={handleAuthorClick}
+          style={{
+            cursor: authorClickable && author?.id ? 'pointer' : 'default',
+            fontSize: '16px',
+            color: authorClickable && author?.id ? 'silver' : 'whitesmoke',
+            marginBottom: '10px',
+            fontWeight: authorClickable && author?.id ? 'bold' : 'none',
+          }}
+        >
+          {author?.name || 'Автор не указан'}
+        </div>
 
       <div className="poem-editor__title mb-3">
         <input
@@ -1563,10 +1568,11 @@ export default PoemItem;-----------------------------------------
         font-size: 16px
 -----------------------------------------
 ----- file: components\PoemsList\PoemsList.tsx -----
-import React, {useState} from 'react';
+import React, {useContext, useState} from 'react';
 import { Container, ListGroup } from 'react-bootstrap';
 import { observer } from 'mobx-react-lite';
 
+import { Context } from '../..';
 import { IPoem, IAuthor } from '../../types/types';
 import ModalPoemDetail from '../Modals/ModalPoemDetail';
 import List from '../List/List';
@@ -1581,6 +1587,7 @@ interface PoemsListProps {
 
 
 const PoemsList: React.FC<PoemsListProps> = observer(({authorPoems, author}) => {
+    const {library} = useContext(Context);
     const [poem, setPoem] = useState<IPoem>({} as IPoem);
     const [visible, setVisible] = useState<boolean>(false);
 
@@ -1590,6 +1597,12 @@ const PoemsList: React.FC<PoemsListProps> = observer(({authorPoems, author}) => 
     };
 
     console.log('PoemsList рендерится, стихов:', authorPoems.length);
+
+    // Обновляем через toggle, чтобы AuthorPage перезагрузил данные
+    const handleSave = () => {
+        library.setToggle(!library.toggle); // <-- ТРИГГЕР ОБНОВЛЕНИЯ
+        setVisible(false);
+    };
 
     return (
         <Container>
@@ -1614,6 +1627,7 @@ const PoemsList: React.FC<PoemsListProps> = observer(({authorPoems, author}) => 
                 onHidePoem={() => setVisible(false)} 
                 poem={poem}
                 author={author}
+                onSave={handleSave}
             />
         </Container>        
     );
@@ -2239,11 +2253,12 @@ const MainPage: React.FC = observer(() => {
     const selectPoem = (item: IPoem) => {
         setPoem(item);
         poemStore.currentPoem = item;
+        const poemAuthor = library.authors.find(a => a.id === item.authorId);
+        setAuthor(poemAuthor || ({} as IAuthor));
         setVisible(true)
     };
 
     const handleSave = () => {
-        // Обновляем список после сохранения
         fetchPoems()
             .then(data => {
                 setPoems(data);
@@ -2287,6 +2302,7 @@ const MainPage: React.FC = observer(() => {
                 poem={poem}
                 author={author}
                 onSave={handleSave}
+                authorClickable={true}
             />
         </Container>
     );

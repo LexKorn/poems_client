@@ -26,11 +26,8 @@ const PoemsList: React.FC<PoemsListProps> = observer(({authorPoems, author}) => 
         setVisible(true)
     };
 
-    console.log('PoemsList рендерится, стихов:', authorPoems.length);
-
-    // Обновляем через toggle, чтобы AuthorPage перезагрузил данные
     const handleSave = () => {
-        library.setToggle(!library.toggle); // <-- ТРИГГЕР ОБНОВЛЕНИЯ
+        library.setToggle(!library.toggle); 
         setVisible(false);
     };
 

@@ -18,11 +18,6 @@ const SearchPanel: React.FC<SearchPanelProps> = ({authors}) => {
         library.setVisibleAuthors((search(authors, value)));
     }, [value, authors]);
 
-    useEffect(() => {
-        search(authors, value);
-    }, [value, authors]);
-
-
     function search(items: (IAuthor)[], term: string) {   
         if (term.length === 0) {
             return items;

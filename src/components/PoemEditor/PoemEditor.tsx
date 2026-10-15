@@ -75,9 +75,13 @@ const PoemEditor: React.FC<PoemEditorProps> = observer(({
     const currentHtml = editorRef.current.innerHTML;
     const currentText = editorRef.current.innerText;
     
-    if (!currentText.trim() && !title.trim()) {
-      alert('Стих не может быть пустым');
+    if (!title.trim()) {
+      alert('Заголовок не может быть пустым');
       return;
+    }
+    if (!currentText.trim()) {
+        alert('Содержание не может быть пустым');
+        return;
     }
     
     try {
@@ -209,9 +213,9 @@ const PoemEditor: React.FC<PoemEditorProps> = observer(({
           style={{
             cursor: authorClickable && author?.id ? 'pointer' : 'default',
             fontSize: '16px',
-            color: authorClickable && author?.id ? '#86b7fe' : 'whitesmoke',
+            color: authorClickable && author?.id ? 'silver' : 'whitesmoke',
             marginBottom: '10px',
-            textDecoration: authorClickable && author?.id ? 'underline' : 'none',
+            fontWeight: authorClickable && author?.id ? 'bold' : 'none',
           }}
         >
           {author?.name || 'Автор не указан'}

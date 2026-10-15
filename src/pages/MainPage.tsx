@@ -53,6 +53,7 @@ const MainPage: React.FC = observer(() => {
         fetchPoems()
             .then(data => {
                 setPoems(data);
+                library.setPoems(data);
                 setVisible(false);
             })
             .catch(err => {
