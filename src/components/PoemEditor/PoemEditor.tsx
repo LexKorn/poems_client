@@ -4,7 +4,7 @@ import { observer } from 'mobx-react-lite';
 
 import { IAuthor, IPoem } from '../../types/types';
 import { deletePoem } from '../../http/poemsAPI';
-import { AUTHOR_ROUTE } from '../../utils/consts'; 
+import { AUTHOR_ROUTE } from '../../utils/consts';
 import poemStore from '../../store/PoemsStore';
 
 import "./poemEditor.sass";
@@ -17,20 +17,24 @@ interface PoemEditorProps {
 }
 
 const PoemEditor: React.FC<PoemEditorProps> = observer(({
-  poem, 
-  author, 
+  poem,
+  author,
   authorClickable = false,
   onSave
 }) => {
   const navigate = useNavigate();
+
+  // Определяем, редактируем ли мы существующий стих
+  const isEditing = !!(poem?.id && poem.id > 0);
+
   const [title, setTitle] = useState(poem?.title || '');
   const [authorId, setAuthorId] = useState(poem?.authorId || 0);
   const [content, setContent] = useState(poem?.content || '');
   const [htmlContent, setHtmlContent] = useState(poem?.html_content || '');
-  const editorRef = useRef<HTMLDivElement>(null);
+  // Новый стих — сразу режим редактирования, существующий — режим просмотра
+  const [isEditMode, setIsEditMode] = useState<boolean>(!isEditing);
 
-  // Определяем, редактируем ли мы существующий стих
-  const isEditing = poem?.id && poem.id > 0;
+  const editorRef = useRef<HTMLDivElement>(null);
 
   // Синхронизируем состояние с пропсом poem
   useEffect(() => {
@@ -38,18 +42,29 @@ const PoemEditor: React.FC<PoemEditorProps> = observer(({
     setAuthorId(poem?.authorId || 0);
     setContent(poem?.content || '');
     setHtmlContent(poem?.html_content || '');
-    
+
     if (editorRef.current) {
       editorRef.current.innerHTML = poem?.html_content || poem?.content || '';
     }
 
-    // Важно: синхронизируем poemStore.currentPoem с переданным poem
+    // Синхронизируем poemStore.currentPoem с переданным poem
     if (poem?.id) {
       poemStore.currentPoem = poem;
     } else {
       poemStore.currentPoem = null;
     }
-  }, [poem]); 
+
+    // Сбрасываем режим редактирования при смене стиха:
+    // новый стих — сразу редактируем, существующий — только чтение
+    setIsEditMode(!poem?.id);
+  }, [poem]);
+
+  // Управление contentEditable через ref (надёжнее, чем через пропс в JSX)
+  useEffect(() => {
+    if (editorRef.current) {
+      editorRef.current.contentEditable = isEditMode ? 'true' : 'false';
+    }
+  }, [isEditMode]);
 
   const formatText = (command: string, value?: string) => {
     document.execCommand(command, false, value);
@@ -71,19 +86,19 @@ const PoemEditor: React.FC<PoemEditorProps> = observer(({
 
   const handleSave = async () => {
     if (!editorRef.current) return;
-    
+
     const currentHtml = editorRef.current.innerHTML;
     const currentText = editorRef.current.innerText;
-    
+
     if (!title.trim()) {
       alert('Заголовок не может быть пустым');
       return;
     }
     if (!currentText.trim()) {
-        alert('Содержание не может быть пустым');
-        return;
+      alert('Содержание не может быть пустым');
+      return;
     }
-    
+
     try {
       if (isEditing) {
         // Обновляем существующий стих
@@ -102,7 +117,7 @@ const PoemEditor: React.FC<PoemEditorProps> = observer(({
           authorId: authorId
         });
       }
-      
+
       if (onSave) {
         onSave();
       }
@@ -131,17 +146,18 @@ const PoemEditor: React.FC<PoemEditorProps> = observer(({
   };
 
   const handleAuthorClick = () => {
-    if (!authorClickable) return; // если не кликабельный — ничего не делаем
-    if (!author?.id) return; // если автор не загружен — ничего не делаем
-    
+    if (!authorClickable) return;
+    if (!author?.id) return;
+
     navigate(AUTHOR_ROUTE + `/${author.id}`);
   };
 
-  
   return (
     <div className="poem-editor">
+      {/* Панель форматирования — только в режиме редактирования */}
+      {isEditMode && (
         <div className="poem-editor__toolbar mb-2">
-          <button 
+          <button
             className="btn btn-sm btn-outline-secondary me-2"
             onClick={() => formatText('bold')}
             title="Жирный"
@@ -149,7 +165,7 @@ const PoemEditor: React.FC<PoemEditorProps> = observer(({
           >
             <strong>B</strong>
           </button>
-          <button 
+          <button
             className="btn btn-sm btn-outline-secondary me-2"
             onClick={() => formatText('italic')}
             title="Курсив"
@@ -157,7 +173,7 @@ const PoemEditor: React.FC<PoemEditorProps> = observer(({
           >
             <em>I</em>
           </button>
-          <button 
+          <button
             className="btn btn-sm btn-outline-secondary me-2"
             onClick={() => formatText('underline')}
             title="Подчеркнутый"
@@ -165,7 +181,7 @@ const PoemEditor: React.FC<PoemEditorProps> = observer(({
           >
             <u>U</u>
           </button>
-          <button 
+          <button
             className="btn btn-sm btn-outline-secondary me-2"
             onClick={() => formatText('insertUnorderedList')}
             title="Маркированный список"
@@ -173,7 +189,7 @@ const PoemEditor: React.FC<PoemEditorProps> = observer(({
           >
             • List
           </button>
-          <button 
+          <button
             className="btn btn-sm btn-outline-secondary me-2"
             onClick={() => formatText('insertOrderedList')}
             title="Нумерованный список"
@@ -181,7 +197,7 @@ const PoemEditor: React.FC<PoemEditorProps> = observer(({
           >
             1. List
           </button>
-          <button 
+          <button
             className="btn btn-sm btn-outline-secondary me-2"
             onClick={() => formatText('formatBlock', '<p>')}
             title="Абзац"
@@ -189,7 +205,7 @@ const PoemEditor: React.FC<PoemEditorProps> = observer(({
           >
             ¶
           </button>
-          <button 
+          <button
             className="btn btn-sm btn-outline-secondary me-2"
             onClick={() => formatText('indent')}
             title="Увеличить отступ"
@@ -197,7 +213,7 @@ const PoemEditor: React.FC<PoemEditorProps> = observer(({
           >
             ↳
           </button>
-          <button 
+          <button
             className="btn btn-sm btn-outline-secondary"
             onClick={() => formatText('outdent')}
             title="Уменьшить отступ"
@@ -206,20 +222,21 @@ const PoemEditor: React.FC<PoemEditorProps> = observer(({
             ↲
           </button>
         </div>
+      )}
 
-        <div 
-          className="poem-editor__author"
-          onClick={handleAuthorClick}
-          style={{
-            cursor: authorClickable && author?.id ? 'pointer' : 'default',
-            fontSize: '16px',
-            color: authorClickable && author?.id ? 'silver' : 'whitesmoke',
-            marginBottom: '10px',
-            fontWeight: authorClickable && author?.id ? 'bold' : 'none',
-          }}
-        >
-          {author?.name || 'Автор не указан'}
-        </div>
+      <div
+        className="poem-editor__author"
+        onClick={handleAuthorClick}
+        style={{
+          cursor: authorClickable && author?.id ? 'pointer' : 'default',
+          fontSize: '16px',
+          color: authorClickable && author?.id ? 'silver' : 'whitesmoke',
+          marginBottom: '10px',
+          fontWeight: authorClickable && author?.id ? 'bold' : 'none',
+        }}
+      >
+        {author?.name || 'Автор не указан'}
+      </div>
 
       <div className="poem-editor__title mb-3">
         <input
@@ -228,16 +245,16 @@ const PoemEditor: React.FC<PoemEditorProps> = observer(({
           placeholder="Заголовок стиха"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
+          readOnly={!isEditMode}
         />
       </div>
 
-      <div 
+      <div
         ref={editorRef}
         className="poem-editor__content form-control"
-        contentEditable
         onInput={handleInput}
         onKeyDown={handleKeyDown}
-        style={{ 
+        style={{
           minHeight: '300px',
           padding: '1rem',
           whiteSpace: 'pre-wrap',
@@ -249,19 +266,41 @@ const PoemEditor: React.FC<PoemEditorProps> = observer(({
         placeholder="Начните вводить текст стиха..."
         suppressContentEditableWarning={true}
       />
+
+      {/* Чекбокс "Редактировать" — только для существующего стиха */}
+      {isEditing && (
+        <div className="poem-editor__edit-toggle mt-3">
+          <input
+            type="checkbox"
+            id="edit-mode"
+            checked={isEditMode}
+            onChange={(e) => setIsEditMode(e.target.checked)}
+            style={{ cursor: 'pointer' }}
+          />
+          <label
+            htmlFor="edit-mode"
+            style={{ marginLeft: '8px', cursor: 'pointer' }}
+          >
+            Редактировать
+          </label>
+        </div>
+      )}
+
+      {/* Кнопки Сохранить / Удалить — только в режиме редактирования */}
+      {isEditMode && (
         <div className="poem-editor__actions mt-3">
-          <button 
+          <button
             className="btn btn-primary me-2"
             onClick={handleSave}
             disabled={poemStore.isLoading}
             type="button"
           >
-            {poemStore.isLoading 
-              ? 'Сохранение...' 
+            {poemStore.isLoading
+              ? 'Сохранение...'
               : poemStore.currentPoem?.id ? 'Обновить' : 'Создать'}
           </button>
           {poemStore.currentPoem?.id && (
-            <button 
+            <button
               className="btn btn-outline-danger"
               onClick={handleDelete}
               type="button"
@@ -270,6 +309,7 @@ const PoemEditor: React.FC<PoemEditorProps> = observer(({
             </button>
           )}
         </div>
+      )}
 
       {poemStore.error && (
         <div className="alert alert-danger mt-3">
