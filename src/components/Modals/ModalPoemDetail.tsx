@@ -29,11 +29,7 @@ const ModalPoemDetail: React.FunctionComponent<ModalPoemDetailProps> = observer(
             onHide={onHidePoem}
             fullscreen="xxl"
             >
-            <Modal.Header closeButton>
-                <Modal.Title>
-                    {poem.id ? 'Редактирование стиха' : 'Новый стих'}
-                </Modal.Title>
-            </Modal.Header>
+            <Modal.Header closeButton></Modal.Header>
             <Modal.Body>
                 <PoemEditor 
                     poem={poem}
