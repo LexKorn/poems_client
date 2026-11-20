@@ -15,7 +15,7 @@ const SearchPanel: React.FC<SearchPanelProps> = ({authors}) => {
     const [value, setValue] = useState<string>('');
 
     useEffect(() => {
-        library.setVisibleAuthors((search(authors, value)));
+        library.setVisibleAuthors(sort(search(authors, value)));
     }, [value, authors]);
 
     function search(items: (IAuthor)[], term: string) {   
@@ -28,6 +28,16 @@ const SearchPanel: React.FC<SearchPanelProps> = ({authors}) => {
                 item.name.toLowerCase().indexOf(term.toLowerCase()) > -1
             )
         }); 
+    };
+
+    function sort(items: (IAuthor)[]) {        
+        let sortItems: (IAuthor)[] = [];
+
+        sortItems = [...items].sort((a, b) => {
+            return a.name > b.name ? 1 : -1;
+        });
+
+        return sortItems;
     };
 
 

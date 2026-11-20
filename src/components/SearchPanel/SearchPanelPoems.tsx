@@ -24,7 +24,7 @@ const SearchPanelPoems: React.FC<SearchPanelPoemsProps> = observer(({poems}) => 
     }, []);
 
     useEffect(() => {
-        library.setVisiblePoems(search(poems, value));
+        library.setVisiblePoems(sort(search(poems, value)));
     }, [value, poems]);
 
     function search(items: (IPoem)[], term: string) {   
@@ -37,6 +37,16 @@ const SearchPanelPoems: React.FC<SearchPanelPoemsProps> = observer(({poems}) => 
                 item.title.toLowerCase().indexOf(term.toLowerCase()) > -1
             )
         }); 
+    };
+
+    function sort(items: (IPoem)[]) {        
+        let sortItems: (IPoem)[] = [];
+
+        sortItems = [...items].sort((a, b) => {
+            return a.title > b.title ? 1 : -1;
+        });
+
+        return sortItems;
     };
 
 
